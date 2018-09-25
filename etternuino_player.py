@@ -13,7 +13,7 @@ from PyQt5 import QtCore
 
 from basic_types import Time
 from chart_parser import Simfile
-from definitions import DEFAULT_SAMPLE_RATE, in_reduce, BYTE_UNCHANGED, BYTE_FALSE, BYTE_TRUE
+from definitions import DEFAULT_SAMPLE_RATE, in_reduce, BYTE_UNCHANGED, BYTE_FALSE, BYTE_TRUE, ARDUINO_MESSAGE_LENGTH
 from rows import GlobalTimedRow, GlobalScheduledRow, Snap
 
 
@@ -68,6 +68,22 @@ class Mixer:
             self.current_frame += frames
 
 
+class EtternuinoTimer:
+    def __init__(self, initial_time=0):
+        self.current_time = initial_time
+        self._real_timer = QtCore.QTimer()
+        self._real_timer.timeout().connect
+        self._is_paused = False
+
+    @QtCore.pyQtSlot()
+    def pause(self):
+        self._is_paused = True
+
+    @QtCore.pyqtSlot()
+    def unpause(self):
+        self._is_paused = False
+
+
 class BaseClapMapper(col.Callable):
     @classmethod
     def __call__(cls, row: GlobalTimedRow) -> np.ndarray:
@@ -95,6 +111,8 @@ class ChartPlayer(QtCore.QObject):
         self.mixer = None
         self.music_stream = None
 
+        self.is_paused = False
+
         music = self.music_out and simfile.music.contents
         if music:
             audio = pydub.AudioSegment.from_file(io.BytesIO(music))
@@ -117,11 +135,15 @@ class ChartPlayer(QtCore.QObject):
         self.time_function = time.perf_counter
         self.is_active = False
 
-        self.blink_schedule = [0] * 10
+        self.blink_schedule = [0] * ARDUINO_MESSAGE_LENGTH
 
     def wait_till(self, end_time: Time) -> None:
         while self.time_function() < end_time:
             pass
+
+    @QtCore.pyQtSlot()
+    def pause(self):
+        self.is_paused = True
 
     @QtCore.pyqtSlot()
     def run(self):

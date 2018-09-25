@@ -3,19 +3,23 @@ BYTE_FALSE = b'\x00'
 BYTE_TRUE = b'\x01'
 BYTE_UNCHANGED = b'\xff'
 
+ARDUINO_MESSAGE_LENGTH = 10
 
-class ArduinoPins:
-    L0, L1, L2, L3 = 0, 1, 2, 3
-    T4, T8, T16, T12, T24, T192 = 4, 5, 6, 7, 8, 9
+LANE_PINS = {
+    0: 11,
+    1: 10,
+    2: 9,
+    3: 8
 
-    @classmethod
-    def get_lane(cls, lane):
-        return (
-                lane is 0 and cls.L0 or
-                lane is 1 and cls.L1 or
-                lane is 2 and cls.L2 or
-                lane is 3 and cls.L3
-        )
+}
+SNAP_PINS = {
+    4: 7,
+    8: 3,
+    16: 5,
+    12: 6,
+    24: 4,
+    192: 2
+}
 
 
 def in_reduce(reduce_logic_func, sequence, inclusion_list) -> bool:
