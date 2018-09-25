@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>etternuino_window</class>
+    <widget class="QMainWindow" name="etternuino_window">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>265</width>
+                <height>244</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Etternuino</string>
+        </property>
+        <widget class="QWidget" name="main_widget">
+            <layout class="QVBoxLayout" name="verticalLayout_3">
+                <item>
+                    <widget class="QFrame" name="lane_group">
+                        <property name="frameShape">
+                            <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                            <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QHBoxLayout" name="horizontalLayout">
+                            <item>
+                                <widget class="QFrame" name="lane_0">
+                                    <property name="frameShape">
+                                        <enum>QFrame::StyledPanel</enum>
+                                    </property>
+                                    <property name="frameShadow">
+                                        <enum>QFrame::Raised</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QFrame" name="lane_1">
+                                    <property name="frameShape">
+                                        <enum>QFrame::StyledPanel</enum>
+                                    </property>
+                                    <property name="frameShadow">
+                                        <enum>QFrame::Raised</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QFrame" name="lane_2">
+                                    <property name="frameShape">
+                                        <enum>QFrame::StyledPanel</enum>
+                                    </property>
+                                    <property name="frameShadow">
+                                        <enum>QFrame::Raised</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QFrame" name="lane_3">
+                                    <property name="frameShape">
+                                        <enum>QFrame::StyledPanel</enum>
+                                    </property>
+                                    <property name="frameShadow">
+                                        <enum>QFrame::Raised</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </widget>
+                </item>
+                <item>
+                    <widget class="QFrame" name="checkbox_group">
+                        <property name="frameShape">
+                            <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                            <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QVBoxLayout" name="verticalLayout">
+                            <item>
+                                <widget class="QCheckBox" name="play_music_checkbox">
+                                    <property name="text">
+                                        <string>Play music</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QCheckBox" name="signal_arduino_checkbox">
+                                    <property name="text">
+                                        <string>Signal Arduino</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QCheckBox" name="add_claps_checkbox">
+                                    <property name="text">
+                                        <string>Add claps</string>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </widget>
+                </item>
+                <item>
+                    <widget class="QFrame" name="play_group">
+                        <property name="frameShape">
+                            <enum>QFrame::StyledPanel</enum>
+                        </property>
+                        <property name="frameShadow">
+                            <enum>QFrame::Raised</enum>
+                        </property>
+                        <layout class="QHBoxLayout" name="horizontalLayout_2">
+                            <item>
+                                <widget class="QPushButton" name="play_file_btn">
+                                    <property name="text">
+                                        <string>Play file</string>
+                                    </property>
+                                    <property name="flat">
+                                        <bool>false</bool>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QProgressBar" name="play_progress">
+                                    <property name="textVisible">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="invertedAppearance">
+                                        <bool>false</bool>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </widget>
+                </item>
+            </layout>
+        </widget>
+    </widget>
+    <resources/>
+    <connections>
+        <connection>
+            <sender>play_file_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>play_file()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>43</x>
+                    <y>679</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>2</x>
+                    <y>419</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>play_music_checkbox</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>play_music_state_change(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>70</x>
+                    <y>339</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>3</x>
+                    <y>219</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>signal_arduino_checkbox</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>signal_arduino_state_change(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>78</x>
+                    <y>409</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>6</x>
+                    <y>258</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>add_claps_checkbox</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>add_clap_state_change(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>40</x>
+                    <y>479</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>0</x>
+                    <y>303</y>
+                </hint>
+            </hints>
+        </connection>
+    </connections>
+    <slots>
+        <slot>play_file()</slot>
+        <slot>play_music_state_change(bool)</slot>
+        <slot>signal_arduino_state_change(bool)</slot>
+        <slot>add_clap_state_change(bool)</slot>
+    </slots>
+</ui>
