@@ -2,8 +2,9 @@ import io
 import time
 from collections import Callable, deque
 from fractions import Fraction
-from typing import Optional
+from typing import Optional, TextIO
 
+import attr
 import numpy as np
 import pydub
 import serial
@@ -17,14 +18,14 @@ from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCH
 from rows import GlobalScheduledRow, GlobalTimedRow, Snap
 
 
+@attr.attrs(cmp=False)
 class Mixer(object):
-    def __init__(self, data: np.ndarray, sample_rate: int):
-        self.data = data
-        self.sample_rate = sample_rate
-        self.current_frame = 0
+    data: np.ndarray = np.zeros(60 * DEFAULT_SAMPLE_RATE, 2)
+    sample_rate: int = DEFAULT_SAMPLE_RATE
+    current_frame: int = 0
 
     @classmethod
-    def from_file(cls, source_file: str, sound_start: Time = 0):
+    def from_file(cls, source_file: TextIO, sound_start: Time = 0):
         data, sample_rate = sf.read(source_file, dtype='float32')
         mixer = cls(data, sample_rate)
 
@@ -35,10 +36,6 @@ class Mixer(object):
             mixer.data = mixer.data[mixer.sample_rate * sound_start:]
 
         return mixer
-
-    @classmethod
-    def null_mixer(cls):
-        return cls(np.zeros(60 * DEFAULT_SAMPLE_RATE, 2), DEFAULT_SAMPLE_RATE)
 
     def add_sound(self, sound_data: np.ndarray, at_time: Time):
         sample_start = int(self.sample_rate * at_time)
@@ -59,7 +56,7 @@ class Mixer(object):
         if max_volume > 1:
             self.data[sample_start: sample_start + sound_data.shape[0]] *= 1 / max_volume
 
-    def __call__(self, outdata, frames, at_time, status):
+    def __call__(self, outdata: np.ndarray, frames: int, at_time, status: int):
         sample_start = self.current_frame
         if sample_start + frames > self.data.shape[0]:
             outdata.fill(0)
@@ -68,12 +65,15 @@ class Mixer(object):
             self.current_frame += frames
 
 
+@attr.attrs(cmp=False)
 class EtternuinoTimer:
-    def __init__(self, initial_time=0):
-        self.current_time = initial_time
-        self._real_timer = QtCore.QTimer()
-        self._real_timer.timeout().connect
-        self._is_paused = False
+    current_time: int = 0
+    _real_timer = attr.attrib(factory=QtCore.QTimer, init=False)
+    _is_paused: bool = False
+
+    def __attrs_post_init__(self):
+        # self._real_timer.timeout().connect
+        pass
 
     @QtCore.pyQtSlot()
     def pause(self):
@@ -111,13 +111,11 @@ class ChartPlayer(QtCore.QObject):
         self.mixer = None
         self.music_stream = None
 
-        self.is_paused = False
-
         music = self.music_out and simfile.music.contents
         if music:
             audio = pydub.AudioSegment.from_file(io.BytesIO(music))
-            audio.export('temp.wav', format='wav')
-            self.mixer = Mixer.from_file('temp.wav', self.sound_start_delta)
+            transformed = audio.export(format='wav')
+            self.mixer = Mixer.from_file(transformed, self.sound_start_delta)
         elif self.clap:
             self.mixer = Mixer.null_mixer()
 

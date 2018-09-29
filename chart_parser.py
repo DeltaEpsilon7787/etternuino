@@ -28,7 +28,7 @@ class AugmentedChart(object):
     diff_value: int = 1
     note_field: List[GlobalTimedRow] = Factory(list)
     bpm_segments: List[MeasureValuePair] = Factory(list)
-    stop_segments: List[MeasureValuePair] = Factory(list)
+    stop_segments: List[MeasureMeasurePair] = Factory(list)
     offset: Time = 0
 
     def time(self):
