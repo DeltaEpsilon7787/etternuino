@@ -8,7 +8,7 @@ from typing import List, Optional
 import lark
 from attr import Factory, attrib, attrs
 
-from basic_types import Objects, Time
+from basic_types import NoteObjects, Time
 from complex_types import MeasureMeasurePair, MeasureValuePair
 from rows import GlobalRow, GlobalTimedRow, LocalRow, PureRow
 
@@ -22,7 +22,10 @@ class PureChart(object):
 
 
 @attrs(cmp=False, auto_attribs=True)
-class AugmentedChart(PureChart):
+class AugmentedChart(object):
+    step_artist: Optional[str] = None
+    diff_name: str = 'Beginner'
+    diff_value: int = 1
     note_field: List[GlobalTimedRow] = Factory(list)
     bpm_segments: List[MeasureValuePair] = Factory(list)
     stop_segments: List[MeasureValuePair] = Factory(list)
@@ -72,7 +75,7 @@ class AugmentedChart(PureChart):
 
             augmented_notefield.append(GlobalTimedRow(**last_object.__dict__, time=elapsed_time - self.offset))
 
-        self.notefield = augmented_notefield
+        self.note_field = augmented_notefield
 
 
 @attrs(cmp=False)
@@ -109,7 +112,7 @@ class ChartTransformer(lark.Transformer):
 
     @staticmethod
     def row(tokens):
-        return PureRow(Objects(''.join(tokens)))
+        return PureRow(NoteObjects(''.join(tokens)))
 
     @staticmethod
     def measure(tokens):

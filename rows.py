@@ -2,7 +2,7 @@ from functools import lru_cache
 
 from attr import attrib, attrs
 
-from basic_types import GlobalPosition, LocalPosition, Objects, Time
+from basic_types import GlobalPosition, LocalPosition, NoteObjects, Time
 from complex_types import Color
 from definitions import SNAP_PINS
 
@@ -11,65 +11,46 @@ class InvalidNoteObjectType(Exception):
     pass
 
 
-@attrs(cmp=False)
+@attrs(cmp=False, auto_attribs=True)
 class PureRow(object):
-    objects: Objects = attrib(converter=Objects)
-
-    @objects.validator
-    def _(self, attr_name, value):
-        if not all(char in '012345M' for char in value):
-            raise InvalidNoteObjectType
-
-    def __hash__(self):
-        encoding_string = "012345M"
-        return sum(
-            encoding_string.index(character) * len(encoding_string) ** pos
-            for pos, character in enumerate(self.objects)
-        )
-
-    def __str__(self):
-        return hash(self)
+    objects: NoteObjects
 
 
-@attrs(cmp=True)
-class LocalRow(PureRow):
-    @staticmethod
-    def pos_validator(attr_name, value):
-        if not 0 <= value < 1:
-            raise ValueError
+@attrs(cmp=True, auto_attribs=True)
+class LocalRow(object):
+    objects: NoteObjects = attrib(cmp=False)
+    pos: LocalPosition
 
     @property
     @lru_cache
     def snap(self):
         return Snap.from_row(self).snap_value
 
-    pos: LocalPosition = attrib(converter=LocalPosition, validator=pos_validator)
 
-
-@attrs(cmp=True)
-class GlobalRow(LocalRow):
-    @staticmethod
-    def pos_validator(attr_name, value):
-        if value < 0:
-            raise ValueError
+@attrs(cmp=True, auto_attribs=True)
+class GlobalRow(object):
+    objects: NoteObjects = attrib(cmp=False)
+    pos: GlobalPosition
 
     @property
     @lru_cache
     def measure(self):
-        # noinspection PyTypeChecker
-        return int(self.pos)
-
-    pos: GlobalPosition = attrib(converter=GlobalPosition, validator=pos_validator)
+        return int(self.pos.real)
 
 
-@attrs(cmp=True)
+@attrs(cmp=True, auto_attribs=True)
 class GlobalTimedRow(GlobalRow):
-    pos: GlobalPosition = attrib(converter=GlobalPosition, cmp=False)
+    objects: NoteObjects = attrib(cmp=False)
+    pos: GlobalPosition = attrib(cmp=False)
     time: Time = attrib(cmp=True)
 
 
-@attrs(cmp=True)
+@attrs(cmp=True, auto_attribs=True)
 class GlobalScheduledRow(GlobalTimedRow):
+    objects: NoteObjects = attrib(cmp=False)
+    pos: GlobalPosition = attrib(cmp=False)
+    time: Time = attrib(cmp=True)
+
     @classmethod
     def from_source(cls, source, offset):
         return cls(source.objects, source.pos, source.time + offset)
@@ -98,7 +79,7 @@ class Snap(object):
 
     @property
     def arduino_pins(self):
-        return self.arduino_mapping.get(self.snap_value, [ArduinoPins.T192])
+        return self.arduino_mapping.get(self.snap_value, [SNAP_PINS[192]])
 
     @property
     def color(self):
