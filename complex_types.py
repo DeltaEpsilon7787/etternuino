@@ -1,6 +1,6 @@
 from fractions import Fraction
 
-from attr.__init__ import attrs, attr
+from attr import attrib, attrs
 
 from basic_types import Beat, Measure
 
@@ -10,9 +10,9 @@ def _beat_to_measure(beat: Beat) -> Measure:
 
 
 @attrs(cmp=False, frozen=True, slots=True)
-class MeasureValuePair:
-    measure: Measure = attr(converter=_beat_to_measure)
-    value: Fraction = attr(converter=Fraction)
+class MeasureValuePair(object):
+    measure: Measure = attrib(converter=_beat_to_measure)
+    value: Fraction = attrib(converter=Fraction)
 
     @measure.validator
     def _(self, attr_name, value):
@@ -29,7 +29,7 @@ class MeasureValuePair:
 
 @attrs(cmp=False, frozen=True, slots=True)
 class MeasureMeasurePair(MeasureValuePair):
-    value: Measure = attr(converter=_beat_to_measure)
+    value: Measure = attrib(converter=_beat_to_measure)
 
 
 def _clamp_color(value):
@@ -37,12 +37,14 @@ def _clamp_color(value):
 
 
 @attrs(frozen=True, cmp=False, slots=True)
-class Color:
-    r: int = attr(cmp=False, converter=_clamp_color)
-    g: int = attr(cmp=False, converter=_clamp_color)
-    b: int = attr(cmp=False, converter=_clamp_color)
+class Color(object):
+    r: int = attrib(cmp=False, converter=_clamp_color)
+    g: int = attrib(cmp=False, converter=_clamp_color)
+    b: int = attrib(cmp=False, converter=_clamp_color)
 
     def __add__(self, other):
-        return Color(self.r + other.r,
-                     self.g + other.g,
-                     self.b + other.b)
+        return Color(
+            self.r + other.r,
+            self.g + other.g,
+            self.b + other.b
+        )

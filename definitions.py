@@ -21,7 +21,6 @@ SNAP_PINS = {
     192: 2
 }
 
-
 def in_reduce(reduce_logic_func, sequence, inclusion_list) -> bool:
     """Using `reduce_logic_func` check if each element of `sequence` is in `inclusion_list`"""
     return reduce_logic_func(elmn in inclusion_list for elmn in sequence)

@@ -1,37 +1,37 @@
 import operator as op
 import os
 import re
-from collections import __init__ as col
+from collections import deque
 from fractions import Fraction
-from typing import Optional, List
+from typing import List, Optional
 
 import lark
-from attr.__init__ import attrs, attr
+from attr import Factory, attrib, attrs
 
-from basic_types import Time
-from complex_types import MeasureValuePair, MeasureMeasurePair
-from rows import GlobalRow, GlobalTimedRow, PureRow, LocalRow
-
-
-@attrs(cmp=False, slots=True)
-class PureChart:
-    step_artist: Optional[str] = attr(default=None)
-    diff_name: str = attr(default='Beginner')
-    diff_value: int = attr(default=1)
-    notefield: List[GlobalRow] = attr(factory=list)
+from basic_types import Objects, Time
+from complex_types import MeasureMeasurePair, MeasureValuePair
+from rows import GlobalRow, GlobalTimedRow, LocalRow, PureRow
 
 
-@attrs(cmp=False, slots=True)
+@attrs(cmp=False, auto_attribs=True)
+class PureChart(object):
+    step_artist: Optional[str] = None
+    diff_name: str = 'Beginner'
+    diff_value: int = 1
+    note_field: List[GlobalRow] = Factory(list)
+
+
+@attrs(cmp=False, auto_attribs=True)
 class AugmentedChart(PureChart):
-    notefield: List[GlobalTimedRow] = attr(factory=list)
-    bpm_segments: List[MeasureValuePair] = attr(factory=list)
-    stop_segments: List[MeasureValuePair] = attr(factory=list)
-    offset: Time = attr(0)
+    note_field: List[GlobalTimedRow] = Factory(list)
+    bpm_segments: List[MeasureValuePair] = Factory(list)
+    stop_segments: List[MeasureValuePair] = Factory(list)
+    offset: Time = 0
 
     def time(self):
-        bpm_segments = col.deque(sorted(self.bpm_segments, key=op.attrgetter('measure')))
-        stop_segments = col.deque(sorted(self.stop_segments, key=op.attrgetter('measure')))
-        notefield = col.deque(sorted(self.notefield, key=op.attrgetter('pos')))
+        bpm_segments = deque(sorted(self.bpm_segments, key=op.attrgetter('measure')))
+        stop_segments = deque(sorted(self.stop_segments, key=op.attrgetter('measure')))
+        notefield = deque(sorted(self.notefield, key=op.attrgetter('pos')))
 
         # Time for serious state magic
         elapsed_time = 0
@@ -75,29 +75,29 @@ class AugmentedChart(PureChart):
         self.notefield = augmented_notefield
 
 
-@attrs(cmp=False, slots=True)
-class FileContents:
-    contents: bytes = attr(repr=False)
+@attrs(cmp=False)
+class FileContents(object):
+    contents: bytes = attrib(repr=False)
 
 
-@attrs(cmp=False, slots=True)
-class Simfile:
-    title: str = attr(default="")
-    subtitle: str = attr(default="")
-    artist: str = attr(default="")
-    genre: str = attr(default="")
-    credit: str = attr(default="")
-    music: Optional[FileContents] = attr(default=None)
-    banner: Optional[FileContents] = attr(default=None)
-    bg: Optional[FileContents] = attr(default=None)
-    cdtitle: Optional[FileContents] = attr(default=None)
-    sample_start: Time = attr(0)
-    sample_length: Time = attr(10)
+@attrs(cmp=False)
+class Simfile(object):
+    title: str = attrib(default="")
+    subtitle: str = attrib(default="")
+    artist: str = attrib(default="")
+    genre: str = attrib(default="")
+    credit: str = attrib(default="")
+    music: Optional[FileContents] = attrib(default=None)
+    banner: Optional[FileContents] = attrib(default=None)
+    bg: Optional[FileContents] = attrib(default=None)
+    cdtitle: Optional[FileContents] = attrib(default=None)
+    sample_start: Time = attrib(default=0)
+    sample_length: Time = attrib(default=10)
     display_bpm: str = '*'
-    bpm_segments: List[MeasureValuePair] = attr(factory=list)
-    stop_segments: List[MeasureMeasurePair] = attr(factory=list)
-    offset: Time = attr(0, converter=Time)
-    charts: List[AugmentedChart] = attr(factory=list)
+    bpm_segments: List[MeasureValuePair] = attrib(factory=list)
+    stop_segments: List[MeasureMeasurePair] = attrib(factory=list)
+    offset: Time = attrib(default=0, converter=Time)
+    charts: List[AugmentedChart] = attrib(factory=list)
 
 
 class ChartTransformer(lark.Transformer):
@@ -109,7 +109,7 @@ class ChartTransformer(lark.Transformer):
 
     @staticmethod
     def row(tokens):
-        return PureRow(''.join(tokens))
+        return PureRow(Objects(''.join(tokens)))
 
     @staticmethod
     def measure(tokens):
@@ -126,11 +126,12 @@ class ChartTransformer(lark.Transformer):
             for local_row in measure
         ]
 
-    def notes(self, tokens):
+    @staticmethod
+    def notes(tokens):
         try:
-            return PureChart(*map(self.extract_first, tokens[:3]), tokens[4])
+            return PureChart(*map(ChartTransformer.extract_first, tokens[:3]), tokens[4])
         except IndexError:
-            return PureChart('', *map(self.extract_first, tokens[:2]), tokens[3])
+            return PureChart('', *map(ChartTransformer.extract_first, tokens[:2]), tokens[3])
 
     @staticmethod
     def safe_file(tokens):
@@ -166,24 +167,48 @@ class ChartTransformer(lark.Transformer):
 
         return result
 
+    @staticmethod
+    def dontcare(__):
+        return None
+
+    @staticmethod
+    def false(__):
+        return False
+
+    @staticmethod
+    def true(__):
+        return True
+
+    @staticmethod
+    def phrase(tokens):
+        return str(tokens[0])
+
+    @staticmethod
+    def float(tokens):
+        return Fraction(tokens[0])
+
+    @staticmethod
+    def int(tokens):
+        return int(tokens[0])
+
+    @staticmethod
+    def beat_value_pair(tokens):
+        return MeasureValuePair.from_string_list(tokens)
+
+    @staticmethod
+    def beat_beat_pair(tokens):
+        return MeasureMeasurePair.from_string_list(tokens)
+
     row4 = row6 = row8 = row
     measure4 = measure6 = measure8 = measure
     measures4 = measures6 = measures8 = measures
-    dontcare = lambda _, __: None
-    false = lambda _, __: False
-    true = lambda _, __: True
-    no_comma_phrase = no_colon_phrase = phrase = lambda _, tokens: str(tokens[0])
+    no_comma_phrase = no_colon_phrase = phrase
     file = safe_file
-    float = lambda _, tokens: Fraction(tokens[0]) or None
-    int = lambda _, tokens: int(tokens[0])
-    beat_value_pair = lambda _, tokens: MeasureValuePair.from_string_list(tokens)
-    beat_beat_pair = lambda _, tokens: MeasureMeasurePair.from_string_list(tokens)
-
-
-sm_transformer = ChartTransformer()
 
 
 def parse_simfile(file_path):
+    sm_transformer = ChartTransformer()
+
     this_dir = os.getcwd()
 
     with open(file_path, encoding='utf-8', errors='ignore') as chart:

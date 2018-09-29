@@ -1,19 +1,19 @@
 from functools import lru_cache
 
-from attr.__init__ import attrs, attr
+from attr import attrib, attrs
 
-from basic_types import Objects, LocalPosition, GlobalPosition, Time
+from basic_types import GlobalPosition, LocalPosition, Objects, Time
 from complex_types import Color
-from definitions import ArduinoPins
+from definitions import SNAP_PINS
 
 
 class InvalidNoteObjectType(Exception):
     pass
 
 
-@attrs(cmp=False, frozen=True, slots=True)
-class PureRow:
-    objects: Objects = attr(converter=Objects)
+@attrs(cmp=False)
+class PureRow(object):
+    objects: Objects = attrib(converter=Objects)
 
     @objects.validator
     def _(self, attr_name, value):
@@ -31,12 +31,10 @@ class PureRow:
         return hash(self)
 
 
-@attrs(cmp=True, frozen=True, slots=True)
+@attrs(cmp=True)
 class LocalRow(PureRow):
-    pos: LocalPosition = attr(converter=LocalPosition)
-
-    @pos.validator
-    def _(self, attr_name, value):
+    @staticmethod
+    def pos_validator(attr_name, value):
         if not 0 <= value < 1:
             raise ValueError
 
@@ -45,13 +43,13 @@ class LocalRow(PureRow):
     def snap(self):
         return Snap.from_row(self).snap_value
 
+    pos: LocalPosition = attrib(converter=LocalPosition, validator=pos_validator)
 
-@attrs(cmp=True, frozen=True, slots=True)
+
+@attrs(cmp=True)
 class GlobalRow(LocalRow):
-    pos: GlobalPosition = attr(converter=GlobalPosition)
-
-    @pos.validator
-    def _(self, attr_name, value):
+    @staticmethod
+    def pos_validator(attr_name, value):
         if value < 0:
             raise ValueError
 
@@ -61,39 +59,41 @@ class GlobalRow(LocalRow):
         # noinspection PyTypeChecker
         return int(self.pos)
 
+    pos: GlobalPosition = attrib(converter=GlobalPosition, validator=pos_validator)
 
-@attrs(cmp=True, frozen=True, slots=True)
+
+@attrs(cmp=True)
 class GlobalTimedRow(GlobalRow):
-    pos: GlobalPosition = attr(converter=GlobalPosition, cmp=False)
-    time: Time = attr(cmp=True)
+    pos: GlobalPosition = attrib(converter=GlobalPosition, cmp=False)
+    time: Time = attrib(cmp=True)
 
 
-@attrs(cmp=True, frozen=True, slots=True)
+@attrs(cmp=True)
 class GlobalScheduledRow(GlobalTimedRow):
     @classmethod
     def from_source(cls, source, offset):
         return cls(source.objects, source.pos, source.time + offset)
 
 
-@attrs(cmp=False, slots=True)
-class Snap:
-    real_snap: int = attr()
+@attrs(cmp=False)
+class Snap(object):
+    real_snap: int = attrib()
 
     arduino_mapping = {
-        1: [ArduinoPins.T4],
-        2: [ArduinoPins.T4],
-        3: [ArduinoPins.T12],
-        4: [ArduinoPins.T4],
-        8: [ArduinoPins.T8],
-        12: [ArduinoPins.T12],
-        16: [ArduinoPins.T16],
-        24: [ArduinoPins.T24],
-        32: [ArduinoPins.T4, ArduinoPins.T8],
-        48: [ArduinoPins.T4, ArduinoPins.T12],
-        64: [ArduinoPins.T4, ArduinoPins.T16],
-        96: [ArduinoPins.T8, ArduinoPins.T12],
-        128: [ArduinoPins.T8, ArduinoPins.T16],
-        192: [ArduinoPins.T12, ArduinoPins.T16]
+        1: [SNAP_PINS[4]],
+        2: [SNAP_PINS[4]],
+        3: [SNAP_PINS[12]],
+        4: [SNAP_PINS[4]],
+        8: [SNAP_PINS[8]],
+        12: [SNAP_PINS[12]],
+        16: [SNAP_PINS[16]],
+        24: [SNAP_PINS[24]],
+        32: [SNAP_PINS[4], SNAP_PINS[8]],
+        48: [SNAP_PINS[4], SNAP_PINS[12]],
+        64: [SNAP_PINS[4], SNAP_PINS[16]],
+        96: [SNAP_PINS[8], SNAP_PINS[12]],
+        128: [SNAP_PINS[8], SNAP_PINS[16]],
+        192: [SNAP_PINS[12], SNAP_PINS[16]]
     }
 
     @property

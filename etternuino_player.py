@@ -1,6 +1,6 @@
 import io
 import time
-from collections import __init__ as col
+from collections import Callable, deque
 from fractions import Fraction
 from typing import Optional
 
@@ -13,11 +13,11 @@ from PyQt5 import QtCore
 
 from basic_types import Time
 from chart_parser import Simfile
-from definitions import DEFAULT_SAMPLE_RATE, in_reduce, BYTE_UNCHANGED, BYTE_FALSE, BYTE_TRUE, ARDUINO_MESSAGE_LENGTH
-from rows import GlobalTimedRow, GlobalScheduledRow, Snap
+from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, in_reduce
+from rows import GlobalScheduledRow, GlobalTimedRow, Snap
 
 
-class Mixer:
+class Mixer(object):
     def __init__(self, data: np.ndarray, sample_rate: int):
         self.data = data
         self.sample_rate = sample_rate
@@ -84,7 +84,7 @@ class EtternuinoTimer:
         self._is_paused = False
 
 
-class BaseClapMapper(col.Callable):
+class BaseClapMapper(Callable):
     @classmethod
     def __call__(cls, row: GlobalTimedRow) -> np.ndarray:
         return NotImplemented
@@ -153,7 +153,7 @@ class ChartPlayer(QtCore.QObject):
             return
 
         notes = sorted(chart.notefield)
-        notes = col.deque(
+        notes = deque(
             row
             for row in notes
             if not in_reduce(all, row.objects, ('0', 'M'))
@@ -169,7 +169,7 @@ class ChartPlayer(QtCore.QObject):
         self.music_stream and self.music_stream.start()
         start = self.time_function() - self.sound_start_delta
 
-        notes = col.deque(
+        notes = deque(
             GlobalScheduledRow.from_source(row, start)
             for row in notes
         )
