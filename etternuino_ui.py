@@ -2,25 +2,28 @@
 
 # Form implementation generated from reading ui file 'etternuino.ui'
 #
-# Created by: PyQt5 UI code generator 5.9.2
+# Created by: PyQt5 UI code generator 5.6
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtWidgets
 
+from etternuino_player import EtternuinoApp
+
 
 class Ui_etternuino_window(object):
     def setupUi(self, etternuino_window):
         etternuino_window.setObjectName("etternuino_window")
+        etternuino_window.resize(794, 416)
+        etternuino_window.setWindowTitle("Etternuino")
         self.main_widget = QtWidgets.QWidget(etternuino_window)
         self.main_widget.setObjectName("main_widget")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.main_widget)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
-        self.lane_group = QtWidgets.QFrame(self.main_widget)
-        self.lane_group.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.lane_group.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.lane_group = QtWidgets.QWidget(self.main_widget)
         self.lane_group.setObjectName("lane_group")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.lane_group)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.lane_0 = QtWidgets.QFrame(self.lane_group)
         self.lane_0.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -43,51 +46,84 @@ class Ui_etternuino_window(object):
         self.lane_3.setObjectName("lane_3")
         self.horizontalLayout.addWidget(self.lane_3)
         self.verticalLayout_3.addWidget(self.lane_group)
-        self.checkbox_group = QtWidgets.QFrame(self.main_widget)
-        self.checkbox_group.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.checkbox_group.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.checkbox_group = QtWidgets.QWidget(self.main_widget)
         self.checkbox_group.setObjectName("checkbox_group")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.play_music_checkbox.setChecked(True)
         self.play_music_checkbox.setObjectName("play_music_checkbox")
         self.verticalLayout.addWidget(self.play_music_checkbox)
         self.signal_arduino_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.signal_arduino_checkbox.setChecked(True)
         self.signal_arduino_checkbox.setObjectName("signal_arduino_checkbox")
         self.verticalLayout.addWidget(self.signal_arduino_checkbox)
         self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.add_claps_checkbox.setObjectName("add_claps_checkbox")
         self.verticalLayout.addWidget(self.add_claps_checkbox)
         self.verticalLayout_3.addWidget(self.checkbox_group)
-        self.play_group = QtWidgets.QFrame(self.main_widget)
-        self.play_group.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.play_group.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.play_group = QtWidgets.QWidget(self.main_widget)
         self.play_group.setObjectName("play_group")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
+        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.play_file_btn = QtWidgets.QPushButton(self.play_group)
         self.play_file_btn.setFlat(False)
         self.play_file_btn.setObjectName("play_file_btn")
         self.horizontalLayout_2.addWidget(self.play_file_btn)
-        self.play_progress = QtWidgets.QProgressBar(self.play_group)
-        self.play_progress.setTextVisible(False)
-        self.play_progress.setInvertedAppearance(False)
-        self.play_progress.setObjectName("play_progress")
-        self.horizontalLayout_2.addWidget(self.play_progress)
         self.verticalLayout_3.addWidget(self.play_group)
+        self.control_group = QtWidgets.QWidget(self.main_widget)
+        self.control_group.setObjectName("control_group")
+        self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
+        self.play_active_group.setContentsMargins(0, 0, 0, 0)
+        self.play_active_group.setObjectName("play_active_group")
+        self.pause_stop_group = QtWidgets.QWidget(self.control_group)
+        self.pause_stop_group.setEnabled(True)
+        self.pause_stop_group.setObjectName("pause_stop_group")
+        self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
+        self.ctrl_button_group.setContentsMargins(0, 0, 0, 0)
+        self.ctrl_button_group.setObjectName("ctrl_button_group")
+        self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.pause_btn.setObjectName("pause_btn")
+        self.ctrl_button_group.addWidget(self.pause_btn)
+        self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.stop_btn.setObjectName("stop_btn")
+        self.ctrl_button_group.addWidget(self.stop_btn)
+        self.play_active_group.addWidget(self.pause_stop_group)
+        self.progress_bar = QtWidgets.QProgressBar(self.control_group)
+        self.progress_bar.setProperty("value", 0)
+        self.progress_bar.setFormat("%v")
+        self.progress_bar.setObjectName("progress_bar")
+        self.play_active_group.addWidget(self.progress_bar)
+        self.verticalLayout_3.addWidget(self.control_group)
         etternuino_window.setCentralWidget(self.main_widget)
 
         self.retranslateUi(etternuino_window)
         self.play_file_btn.clicked.connect(etternuino_window.play_file)
-        self.play_music_checkbox.toggled['bool'].connect(etternuino_window.play_music_state_change)
-        self.signal_arduino_checkbox.toggled['bool'].connect(etternuino_window.signal_arduino_state_change)
-        self.add_claps_checkbox.toggled['bool'].connect(etternuino_window.add_clap_state_change)
+        self.pause_btn.clicked.connect(etternuino_window.pause)
+        self.stop_btn.clicked.connect(etternuino_window.stop)
+        self.play_music_checkbox.toggled['bool'].connect(etternuino_window.play_music)
+        self.signal_arduino_checkbox.toggled['bool'].connect(etternuino_window.signal_arduino)
+        self.add_claps_checkbox.toggled['bool'].connect(etternuino_window.add_claps)
         QtCore.QMetaObject.connectSlotsByName(etternuino_window)
 
     def retranslateUi(self, etternuino_window):
         _translate = QtCore.QCoreApplication.translate
-        etternuino_window.setWindowTitle(_translate("etternuino_window", "Etternuino"))
         self.play_music_checkbox.setText(_translate("etternuino_window", "Play music"))
         self.signal_arduino_checkbox.setText(_translate("etternuino_window", "Signal Arduino"))
         self.add_claps_checkbox.setText(_translate("etternuino_window", "Add claps"))
         self.play_file_btn.setText(_translate("etternuino_window", "Play file"))
+        self.pause_btn.setText(_translate("etternuino_window", "Pause"))
+        self.stop_btn.setText(_translate("etternuino_window", "Stop"))
+
+
+if __name__ == "__main__":
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    etternuino_window = EtternuinoApp()
+    ui = Ui_etternuino_window()
+    ui.setupUi(etternuino_window)
+    etternuino_window.show()
+    sys.exit(app.exec_())

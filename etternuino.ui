@@ -6,23 +6,17 @@
             <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>265</width>
-                <height>244</height>
+                <width>794</width>
+                <height>416</height>
             </rect>
         </property>
         <property name="windowTitle">
-            <string>Etternuino</string>
+            <string notr="true">Etternuino</string>
         </property>
         <widget class="QWidget" name="main_widget">
             <layout class="QVBoxLayout" name="verticalLayout_3">
                 <item>
-                    <widget class="QFrame" name="lane_group">
-                        <property name="frameShape">
-                            <enum>QFrame::StyledPanel</enum>
-                        </property>
-                        <property name="frameShadow">
-                            <enum>QFrame::Raised</enum>
-                        </property>
+                    <widget class="QWidget" name="lane_group" native="true">
                         <layout class="QHBoxLayout" name="horizontalLayout">
                             <item>
                                 <widget class="QFrame" name="lane_0">
@@ -68,18 +62,15 @@
                     </widget>
                 </item>
                 <item>
-                    <widget class="QFrame" name="checkbox_group">
-                        <property name="frameShape">
-                            <enum>QFrame::StyledPanel</enum>
-                        </property>
-                        <property name="frameShadow">
-                            <enum>QFrame::Raised</enum>
-                        </property>
+                    <widget class="QWidget" name="checkbox_group" native="true">
                         <layout class="QVBoxLayout" name="verticalLayout">
                             <item>
                                 <widget class="QCheckBox" name="play_music_checkbox">
                                     <property name="text">
                                         <string>Play music</string>
+                                    </property>
+                                    <property name="checked">
+                                        <bool>true</bool>
                                     </property>
                                 </widget>
                             </item>
@@ -87,6 +78,9 @@
                                 <widget class="QCheckBox" name="signal_arduino_checkbox">
                                     <property name="text">
                                         <string>Signal Arduino</string>
+                                    </property>
+                                    <property name="checked">
+                                        <bool>true</bool>
                                     </property>
                                 </widget>
                             </item>
@@ -101,13 +95,7 @@
                     </widget>
                 </item>
                 <item>
-                    <widget class="QFrame" name="play_group">
-                        <property name="frameShape">
-                            <enum>QFrame::StyledPanel</enum>
-                        </property>
-                        <property name="frameShadow">
-                            <enum>QFrame::Raised</enum>
-                        </property>
+                    <widget class="QWidget" name="play_group" native="true">
                         <layout class="QHBoxLayout" name="horizontalLayout_2">
                             <item>
                                 <widget class="QPushButton" name="play_file_btn">
@@ -119,13 +107,42 @@
                                     </property>
                                 </widget>
                             </item>
+                        </layout>
+                    </widget>
+                </item>
+                <item>
+                    <widget class="QWidget" name="control_group" native="true">
+                        <layout class="QHBoxLayout" name="play_active_group">
                             <item>
-                                <widget class="QProgressBar" name="play_progress">
-                                    <property name="textVisible">
-                                        <bool>false</bool>
+                                <widget class="QWidget" name="pause_stop_group" native="true">
+                                    <property name="enabled">
+                                        <bool>true</bool>
                                     </property>
-                                    <property name="invertedAppearance">
-                                        <bool>false</bool>
+                                    <layout class="QVBoxLayout" name="ctrl_button_group">
+                                        <item>
+                                            <widget class="QPushButton" name="pause_btn">
+                                                <property name="text">
+                                                    <string>Pause</string>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                        <item>
+                                            <widget class="QPushButton" name="stop_btn">
+                                                <property name="text">
+                                                    <string>Stop</string>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QProgressBar" name="progress_bar">
+                                    <property name="value">
+                                        <number>0</number>
+                                    </property>
+                                    <property name="format">
+                                        <string notr="true">%v</string>
                                     </property>
                                 </widget>
                             </item>
@@ -144,12 +161,44 @@
             <slot>play_file()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>43</x>
-                    <y>679</y>
+                    <x>127</x>
+                    <y>262</y>
                 </hint>
                 <hint type="destinationlabel">
-                    <x>2</x>
-                    <y>419</y>
+                    <x>787</x>
+                    <y>286</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>pause_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>pause()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>78</x>
+                    <y>345</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>3</x>
+                    <y>328</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>stop_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>stop()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>50</x>
+                    <y>374</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>5</x>
+                    <y>381</y>
                 </hint>
             </hints>
         </connection>
@@ -157,15 +206,15 @@
             <sender>play_music_checkbox</sender>
             <signal>toggled(bool)</signal>
             <receiver>etternuino_window</receiver>
-            <slot>play_music_state_change(bool)</slot>
+            <slot>play_music()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>70</x>
-                    <y>339</y>
+                    <x>47</x>
+                    <y>131</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>3</x>
-                    <y>219</y>
+                    <y>139</y>
                 </hint>
             </hints>
         </connection>
@@ -173,15 +222,15 @@
             <sender>signal_arduino_checkbox</sender>
             <signal>toggled(bool)</signal>
             <receiver>etternuino_window</receiver>
-            <slot>signal_arduino_state_change(bool)</slot>
+            <slot>signal_arduino()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>78</x>
-                    <y>409</y>
+                    <x>82</x>
+                    <y>153</y>
                 </hint>
                 <hint type="destinationlabel">
-                    <x>6</x>
-                    <y>258</y>
+                    <x>5</x>
+                    <y>181</y>
                 </hint>
             </hints>
         </connection>
@@ -189,23 +238,25 @@
             <sender>add_claps_checkbox</sender>
             <signal>toggled(bool)</signal>
             <receiver>etternuino_window</receiver>
-            <slot>add_clap_state_change(bool)</slot>
+            <slot>add_claps()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>40</x>
-                    <y>479</y>
+                    <x>79</x>
+                    <y>189</y>
                 </hint>
                 <hint type="destinationlabel">
-                    <x>0</x>
-                    <y>303</y>
+                    <x>1</x>
+                    <y>222</y>
                 </hint>
             </hints>
         </connection>
     </connections>
     <slots>
         <slot>play_file()</slot>
-        <slot>play_music_state_change(bool)</slot>
-        <slot>signal_arduino_state_change(bool)</slot>
-        <slot>add_clap_state_change(bool)</slot>
+        <slot>pause()</slot>
+        <slot>stop()</slot>
+        <slot>play_music()</slot>
+        <slot>signal_arduino()</slot>
+        <slot>add_claps()</slot>
     </slots>
 </ui>

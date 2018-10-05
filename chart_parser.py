@@ -34,7 +34,7 @@ class AugmentedChart(object):
     def time(self):
         bpm_segments = deque(sorted(self.bpm_segments, key=op.attrgetter('measure')))
         stop_segments = deque(sorted(self.stop_segments, key=op.attrgetter('measure')))
-        notefield = deque(sorted(self.notefield, key=op.attrgetter('pos')))
+        notefield = deque(sorted(self.note_field, key=op.attrgetter('pos')))
 
         # Time for serious state magic
         elapsed_time = 0
@@ -139,9 +139,7 @@ class ChartTransformer(lark.Transformer):
     @staticmethod
     def safe_file(tokens):
         try:
-            with open(tokens[0], mode='rb') as file:
-                contents = FileContents(file.read())
-            return contents
+            return open(tokens[0], mode='rb')
         except IOError:
             return None
 
@@ -209,7 +207,7 @@ class ChartTransformer(lark.Transformer):
     file = safe_file
 
 
-def parse_simfile(file_path):
+def parse_simfile(file_path) -> Simfile:
     sm_transformer = ChartTransformer()
 
     this_dir = os.getcwd()

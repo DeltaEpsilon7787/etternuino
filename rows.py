@@ -11,42 +11,42 @@ class InvalidNoteObjectType(Exception):
     pass
 
 
-@attrs(cmp=False, auto_attribs=True)
+@attrs(cmp=False)
 class PureRow(object):
-    objects: NoteObjects
+    objects: NoteObjects = attrib()
 
 
-@attrs(cmp=True, auto_attribs=True)
+@attrs(cmp=True)
 class LocalRow(object):
     objects: NoteObjects = attrib(cmp=False)
-    pos: LocalPosition
+    pos: LocalPosition = attrib()
 
     @property
-    @lru_cache
+    @lru_cache(None)
     def snap(self):
         return Snap.from_row(self).snap_value
 
 
-@attrs(cmp=True, auto_attribs=True)
+@attrs(cmp=True)
 class GlobalRow(object):
     objects: NoteObjects = attrib(cmp=False)
-    pos: GlobalPosition
+    pos: GlobalPosition = attrib()
 
     @property
-    @lru_cache
+    @lru_cache(None)
     def measure(self):
         return int(self.pos.real)
 
 
-@attrs(cmp=True, auto_attribs=True)
-class GlobalTimedRow(GlobalRow):
+@attrs(cmp=True)
+class GlobalTimedRow(object):
     objects: NoteObjects = attrib(cmp=False)
     pos: GlobalPosition = attrib(cmp=False)
     time: Time = attrib(cmp=True)
 
 
-@attrs(cmp=True, auto_attribs=True)
-class GlobalScheduledRow(GlobalTimedRow):
+@attrs(cmp=True)
+class GlobalScheduledRow(object):
     objects: NoteObjects = attrib(cmp=False)
     pos: GlobalPosition = attrib(cmp=False)
     time: Time = attrib(cmp=True)
