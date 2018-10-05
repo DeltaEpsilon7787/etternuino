@@ -1,8 +1,9 @@
 import io
-import time
 from collections import Callable, deque
 from fractions import Fraction
-from typing import Optional, TextIO
+from itertools import groupby
+from operator import attrgetter, itemgetter
+from typing import Optional, Sequence, TextIO
 
 import attr
 import numpy as np
@@ -12,22 +13,50 @@ import sounddevice as sd
 import soundfile as sf
 from PyQt5 import QtCore
 
-from basic_types import Time
+from basic_types import NoteObjects, Time
 from chart_parser import Simfile
-from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, in_reduce
+from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
+    SNAP_PINS, in_reduce
 from rows import GlobalScheduledRow, GlobalTimedRow, Snap
 
 
 @attr.attrs(cmp=False)
+class EtternuinoTimer:
+    _real_timer = attr.attrib(factory=QtCore.QElapsedTimer, init=False)
+    _is_paused: bool = True
+    _offset: int = 0
+
+    @QtCore.pyQtSlot()
+    def pause(self):
+        if not self._paused:
+            self._offset += self._real_timer.nsecsElapsed()
+        self._is_paused = True
+
+    @QtCore.pyqtSlot()
+    def unpause(self):
+        self._is_paused = False
+        self._real_timer.restart()
+
+    @property
+    def current_time(self):
+        if self._is_paused:
+            return self._offset
+
+        return (
+                self._real_timer.nsecsElapsed() + self._offset
+        )
+
+
+@attr.attrs(cmp=False)
 class Mixer(object):
+    timer: EtternuinoTimer = attr.NOTHING
     data: np.ndarray = np.zeros(60 * DEFAULT_SAMPLE_RATE, 2)
     sample_rate: int = DEFAULT_SAMPLE_RATE
-    current_frame: int = 0
 
     @classmethod
-    def from_file(cls, source_file: TextIO, sound_start: Time = 0):
+    def from_file(cls, timer: EtternuinoTimer, source_file: TextIO, sound_start: Time = 0):
         data, sample_rate = sf.read(source_file, dtype='float32')
-        mixer = cls(data, sample_rate)
+        mixer = cls(timer, data, sample_rate)
 
         if sound_start < 0:
             padded = np.zeros((mixer.sample_rate * abs(sound_start), mixer.data.shape[1]))
@@ -57,31 +86,11 @@ class Mixer(object):
             self.data[sample_start: sample_start + sound_data.shape[0]] *= 1 / max_volume
 
     def __call__(self, outdata: np.ndarray, frames: int, at_time, status: int):
-        sample_start = self.current_frame
+        sample_start = self.sample_rate * self.timer.current_time
         if sample_start + frames > self.data.shape[0]:
             outdata.fill(0)
         else:
             outdata[:] = self.data[sample_start:sample_start + frames]
-            self.current_frame += frames
-
-
-@attr.attrs(cmp=False)
-class EtternuinoTimer:
-    current_time: int = 0
-    _real_timer = attr.attrib(factory=QtCore.QTimer, init=False)
-    _is_paused: bool = False
-
-    def __attrs_post_init__(self):
-        # self._real_timer.timeout().connect
-        pass
-
-    @QtCore.pyQtSlot()
-    def pause(self):
-        self._is_paused = True
-
-    @QtCore.pyqtSlot()
-    def unpause(self):
-        self._is_paused = False
 
 
 class BaseClapMapper(Callable):
@@ -91,7 +100,9 @@ class BaseClapMapper(Callable):
 
 
 class ChartPlayer(QtCore.QObject):
-    activate_signal = QtCore.pyqtSignal(name='activation_signal')
+    on_start = QtCore.pyqtSignal(name='on_start')
+    on_end = QtCore.pyqtSignal(name='on_end')
+    on_write = QtCore.pyqtSignal('str', name='on_write')
 
     def __init__(self,
                  simfile: Simfile,
@@ -111,37 +122,112 @@ class ChartPlayer(QtCore.QObject):
         self.mixer = None
         self.music_stream = None
 
+        self.timer = EtternuinoTimer()
+
         music = self.music_out and simfile.music.contents
         if music:
             audio = pydub.AudioSegment.from_file(io.BytesIO(music))
             transformed = audio.export(format='wav')
-            self.mixer = Mixer.from_file(transformed, self.sound_start_delta)
+            self.mixer = Mixer.from_file(self.timer, transformed, self.sound_start_delta)
         elif self.clap:
-            self.mixer = Mixer.null_mixer()
+            self.mixer = Mixer(self.timer)
 
         if self.mixer:
             self.music_stream = sd.OutputStream(channels=2,
                                                 samplerate=DEFAULT_SAMPLE_RATE,
                                                 dtype='float32',
                                                 callback=self.mixer)
-            # Music based timer, significantly more accurate
-            self.time_function = lambda: self.mixer.current_frame / self.mixer.sample_rate
 
         self.microblink_duration = Fraction('0.01') if self.arduino else 0
         self.blink_duration = Fraction('0.06') if self.arduino else 0
 
-        self.time_function = time.perf_counter
-        self.is_active = False
-
-        self.blink_schedule = [0] * ARDUINO_MESSAGE_LENGTH
-
     def wait_till(self, end_time: Time) -> None:
-        while self.time_function() < end_time:
+        while self.timer.current_time < end_time:
             pass
+
+    def schedule_events(self, notes: Sequence[NoteObjects]):
+        events = []
+
+        TURN_OFF = 0
+        TURN_ON = 1
+        TURN_ON_AND_BLINK = 2
+
+        @attr.attr
+        class NoteEvent(object):
+            """Set `pin` to `state` at `time`"""
+            pin: int = attr.NOTHING
+            state: int = attr.NOTHING
+            time: Time = attr.NOTHING
+
+        hold_pins = set()
+        last_row_time = 0
+        for row in notes:
+            row_time = row.time
+            row_snap = Snap.from_row(row)
+
+            activated_pins = set()
+            deactivated_pins = set()
+
+            if not in_reduce(all, row.objects, ('0', '3', '5')):
+                deactivated_pins += set(SNAP_PINS.values()) - set(row_snap.arduino_pins)
+                activated_pins += set(row_snap.arduino_pins)
+
+            for lane, note in enumerate(row.objects):
+                lane_pin = LANE_PINS[lane]
+                if note in ('1', '2', '4'):
+                    activated_pins.add(lane_pin)
+
+                elif note in ('2', '4'):
+                    activated_pins.add(lane_pin)
+                    hold_pins.add(lane_pin)
+
+                elif note in ('3', '5'):
+                    deactivated_pins.add(lane_pin)
+                    hold_pins.remove(lane_pin)
+
+            for pin in activated_pins:
+                if row_time - last_row_time < self.blink_duration:
+                    events.append(
+                        NoteEvent(pin,
+                                  TURN_OFF,
+                                  row_time - self.microblink_duration))
+
+                events.append(
+                    NoteEvent(pin,
+                              TURN_ON_AND_BLINK if pin not in hold_pins else TURN_ON,
+                              row_time))
+
+            for pin in deactivated_pins:
+                events.append(NoteEvent(pin, TURN_OFF, row_time))
+
+            last_row_time = row_time
+
+        events.sort(key=attrgetter('time'))
+
+        state_sequence = []
+        for time_point, event_group in groupby(events, attrgetter('time')):
+            sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
+            blink_sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
+            for event in event_group:
+                sequence[event.pin] = BYTE_TRUE if event.state in (TURN_ON, TURN_ON_AND_BLINK) else BYTE_FALSE
+                blink_sequence[event.pin] = BYTE_FALSE if event.state is TURN_ON_AND_BLINK else BYTE_UNCHANGED
+
+            if not in_reduce(all, blink_sequence, (BYTE_UNCHANGED,)):
+                state_sequence.append((time_point + self.blink_duration, b''.join(blink_sequence)))
+            state_sequence.append((time_point, b''.join(sequence)))
+
+        state_sequence.sort(key=itemgetter(0))
+
+        return state_sequence
+
 
     @QtCore.pyQtSlot()
     def pause(self):
-        self.is_paused = True
+        self.timer.pause()
+
+    @QtCore.pyQtSlot()
+    def unpause(self):
+        self.timer.unpause()
 
     @QtCore.pyqtSlot()
     def run(self):
@@ -157,90 +243,35 @@ class ChartPlayer(QtCore.QObject):
             if not in_reduce(all, row.objects, ('0', 'M'))
         )
 
-        self.activate_signal.emit()
-        self.is_active = True
+        self.on_start.emit()
 
         if self.clap_mapper:
             for row in notes:
                 self.mixer.add_sound(self.clap_mapper(row), row.time)
 
-        self.music_stream and self.music_stream.start()
-        start = self.time_function() - self.sound_start_delta
-
         notes = deque(
-            GlobalScheduledRow.from_source(row, start)
+            GlobalScheduledRow.from_source(row, self.sound_start_delta)
             for row in notes
         )
 
         first_note = notes[0]
+        sequence = self.schedule_notes(notes)
+
+        self.music_stream and self.music_stream.start()
+        self.unpause()
         self.wait_till(first_note.time)
 
-        while notes:
-            if not self.is_active:
-                self.die()
-                return
+        try:
+            for time_point, message in sequence:
+                self.wait_till(time_point)
+                self.on_write.emit(message)
 
-            current_row = notes.popleft()
-            current_snap = Snap.from_row(current_row)
-            next_row = notes[0] if notes else current_row
 
-            if self.arduino:
-                blink_message = [BYTE_UNCHANGED] * 10
-                new_message = [BYTE_UNCHANGED] * 10
-
-                if not in_reduce(all, current_row.objects, ('0', '3', '5')):
-                    new_message[4:] = [BYTE_FALSE] * 6
-                    for pin in current_snap.arduino_pins:
-                        new_message[pin] = BYTE_TRUE
-
-                for lane, note in enumerate(current_row.objects):
-                    if note in ('1',):
-                        if self.blink_schedule[lane_map[lane]]:
-                            blink_message[lane_map[lane]] = BYTE_FALSE
-                        new_message[lane_map[lane]] = BYTE_TRUE
-                        self.blink_schedule[lane_map[lane]] = current_row.time + BLINK_DURATION
-
-                    elif note in ('2', '4'):
-                        new_message[lane_map[lane]] = BYTE_TRUE
-                        self.blink_schedule[lane_map[lane]] = 0
-
-                    elif note in ('3', '5'):
-                        new_message[lane_map[lane]] = BYTE_TRUE
-
-                self.arduino and not in_reduce(all, blink_message, (BYTE_UNCHANGED,)) and arduino.write(
-                    b''.join(blink_message))
-                self.wait_till(current_row.time)
-                self.arduino and self.arduino.write(b''.join(new_message))
-
-            next_row_time = next_row.time - self.microblink_duration
-            next_state = None
-            if in_reduce(all, off_schedule, (0,)):
-                next_state = next_row.time
-            else:
-                filtered_schedule = (
-                    timing
-                    for timing in off_schedule
-                    if timing != 0
-                )
-                next_state = min(*filtered_schedule, next_row_time)
-
-                self.wait_till(next_state)
-
-            if next_state is next_row_time:
-                continue
-
-            if self.arduino:
-                off_message = [BYTE_UNCHANGED] * 10
-                for pin, timing in enumerate(off_schedule):
-                    if not timing:
-                        continue
-                    if time_function() >= timing:
-                        off_message[pin] = BYTE_FALSE
-                        off_schedule[pin] = 0
-                    arduino and arduino.write(b''.join(off_message))
-            self.wait_till(next_row_time)
+        except KeyboardInterrupt:
+            self.music_stream and self.music_stream.stop()
+            self.arduino and self.arduino.write(BYTE_FALSE * ARDUINO_MESSAGE_LENGTH)
+            self.on_end.emit()
 
     @QtCore.pyqtSlot()
     def die(self):
-        self.music_stream and music_stream.stop()
-        self.arduino and arduino.write(BYTE_FALSE * 10)
+        raise KeyboardInterrupt
