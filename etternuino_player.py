@@ -1,10 +1,9 @@
-import io
 import os
 from collections import Callable, deque
 from fractions import Fraction
 from itertools import groupby
 from operator import attrgetter, itemgetter
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence, Set, Tuple
 
 import attr
 import easygui_qt
@@ -30,7 +29,7 @@ class EtternuinoTimer:
 
     @QtCore.pyqtSlot()
     def pause(self):
-        if not self._paused:
+        if not self._is_paused:
             self._offset += self._real_timer.nsecsElapsed() / 1e9
         self._is_paused = True
 
@@ -61,7 +60,7 @@ class Mixer(object):
         self.current_frame = 0
 
     @classmethod
-    def from_file(cls, timer: EtternuinoTimer, source_file: io.BytesIO, sound_start: Time = 0):
+    def from_file(cls, timer: EtternuinoTimer, source_file: str, sound_start: Time = 0):
         data, sample_rate = sf.read(source_file, dtype='float32')
         mixer = cls(timer, data, sample_rate)
 
@@ -92,7 +91,7 @@ class Mixer(object):
         if max_volume > 1:
             self.data[sample_start: sample_start + sound_data.shape[0]] *= 1 / max_volume
 
-    def __call__(self, outdata: np.ndarray, frames: int, at_time, status: int):
+    def __call__(self, out_data: np.ndarray, frames: int, at_time, status: int):
         sample_start = int(self.sample_rate * self.timer.current_time)
 
         if np.abs(sample_start - self.current_frame) > frames * 100:
@@ -101,9 +100,9 @@ class Mixer(object):
         sample_start = self.current_frame
 
         if sample_start + frames > self.data.shape[0] or self.timer.is_paused:
-            outdata.fill(0)
+            out_data.fill(0)
         else:
-            outdata[:] = self.data[sample_start:sample_start + frames]
+            out_data[:] = self.data[sample_start:sample_start + frames]
             self.current_frame += frames
 
 
@@ -114,9 +113,9 @@ class BaseClapMapper(Callable):
 
 
 class ChartPlayer(QtCore.QObject):
-    on_start = QtCore.pyqtSignal(name='on_start')
-    on_end = QtCore.pyqtSignal(name='on_end')
-    on_write = QtCore.pyqtSignal('char *', name='on_write')
+    on_start: QtCore.pyqtSignal = QtCore.pyqtSignal()
+    on_end: QtCore.pyqtSignal = QtCore.pyqtSignal()
+    on_write: QtCore.pyqtSignal = QtCore.pyqtSignal()
 
     def __init__(self,
                  simfile: Simfile,
@@ -159,8 +158,6 @@ class ChartPlayer(QtCore.QObject):
             pass
 
     def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
-        events = []
-
         TURN_OFF = 0
         TURN_ON = 1
         TURN_ON_AND_BLINK = 2
@@ -172,7 +169,9 @@ class ChartPlayer(QtCore.QObject):
             state: int = attr.attrib()
             time: Time = attr.attrib()
 
-        hold_pins = set()
+        events: List[NoteEvent] = []
+
+        hold_pins: Set[int] = set()
         last_row_time = 0
         for row in notes:
             row_time = row.time
@@ -187,14 +186,14 @@ class ChartPlayer(QtCore.QObject):
 
             for lane, note in enumerate(row.objects):
                 lane_pin = LANE_PINS[lane]
-                if note in ('1', '2', '4'):
+                if note in ('1',):
                     activated_pins.add(lane_pin)
 
-                elif note in ('2', '4'):
+                if note in ('2', '4'):
                     activated_pins.add(lane_pin)
                     hold_pins.add(lane_pin)
 
-                elif note in ('3', '5'):
+                if note in ('3', '5'):
                     deactivated_pins.add(lane_pin)
                     hold_pins -= {lane_pin}
 
@@ -218,7 +217,7 @@ class ChartPlayer(QtCore.QObject):
 
         events.sort(key=attrgetter('time'))
 
-        state_sequence = []
+        state_sequence: List[Tuple[Time, bytes]] = []
         for time_point, event_group in groupby(events, attrgetter('time')):
             sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
             blink_sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
@@ -227,8 +226,8 @@ class ChartPlayer(QtCore.QObject):
                 blink_sequence[event.pin] = BYTE_FALSE if event.state is TURN_ON_AND_BLINK else BYTE_UNCHANGED
 
             if not in_reduce(all, blink_sequence, (BYTE_UNCHANGED,)):
-                state_sequence.append((time_point + self.blink_duration, b''.join(blink_sequence)))
-            state_sequence.append((time_point, b''.join(sequence)))
+                state_sequence.append((Time(time_point + self.blink_duration), b''.join(blink_sequence)))
+            state_sequence.append((Time(time_point), b''.join(sequence)))
 
         state_sequence.sort(key=itemgetter(0))
 
@@ -291,7 +290,6 @@ class ChartPlayer(QtCore.QObject):
     def die(self):
         raise KeyboardInterrupt
 
-
 class EtternuinoApp(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def play_file(self):
@@ -299,32 +297,28 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         if sm_file is None:
             return
         parsed_simfile = parse_simfile(sm_file)
-        choices = {
-            str(index) + ':' + str(parsed_simfile.charts[index].diff_name)
-            for index in range(len(parsed_simfile.charts))
-        }
         pick = easygui_qt.get_choice('Select what chart to play',
                                      'Chart selection',
                                      [
                                          str(index) + ':' + str(parsed_simfile.charts[index].diff_name)
                                          for index in range(len(parsed_simfile.charts))
                                      ])
-
         if pick is None:
             return
         chart_num = int(pick.split(':')[0])
-
-        self.player = ChartPlayer(simfile=parsed_simfile,
-                                  chart_num=chart_num,
-                                  sound_start_delta=Time(0),
-                                  arduino=(
-                                      serial.Serial('/dev/ttyUSB0', 9600)
-                                      # if self.parent().signal_arduino_checkbox.checked()
-                                      if False
-                                      else None
-                                  ),
-                                  music_out=True,  # self.parent().play_music_checkbox.checked(),
-                                  clap_mapper=None)
+        try:
+            arduino_port = self.parent().signal_arduino_checkbox.isChecked() and serial.Serial('/dev/ttyUSB0',
+                                                                                               9600) or None
+            self.player = ChartPlayer(simfile=parsed_simfile,
+                                      chart_num=chart_num,
+                                      sound_start_delta=Time(Fraction(0, 1)),
+                                      arduino=arduino_port,
+                                      music_out=self.parent().play_music_checkbox.isChecked(),
+                                      clap_mapper=None)
+        except:
+            raise
+        finally:
+            arduino_port and arduino_port.close()
 
         player_thread = QtCore.QThread()
         self.player.moveToThread(player_thread)

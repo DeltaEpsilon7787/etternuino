@@ -7,10 +7,6 @@ from complex_types import Color
 from definitions import SNAP_PINS
 
 
-class InvalidNoteObjectType(Exception):
-    pass
-
-
 @attrs(cmp=False)
 class PureRow(object):
     objects: NoteObjects = attrib()
@@ -19,7 +15,7 @@ class PureRow(object):
 @attrs(cmp=True)
 class LocalRow(object):
     objects: NoteObjects = attrib(cmp=False)
-    pos: LocalPosition = attrib()
+    pos: LocalPosition = attrib(cmp=True)
 
     @property
     @lru_cache(None)
@@ -30,7 +26,7 @@ class LocalRow(object):
 @attrs(cmp=True)
 class GlobalRow(object):
     objects: NoteObjects = attrib(cmp=False)
-    pos: GlobalPosition = attrib()
+    pos: GlobalPosition = attrib(cmp=True)
 
     @property
     @lru_cache(None)

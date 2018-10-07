@@ -26,6 +26,7 @@ class MeasureValuePair(object):
 class MeasureMeasurePair(object):
     measure: Measure = attrib(converter=_beat_to_measure)
     value: Measure = attrib(converter=_beat_to_measure)
+    from_string_list = MeasureValuePair.from_string_list
 
 
 def _clamp_color(value):

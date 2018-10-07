@@ -39,7 +39,6 @@ class AugmentedChart(object):
         # Time for serious state magic
         elapsed_time = 0
         last_measure = 0
-        last_object = None
         last_bpm = bpm_segments.popleft()
         next_stop = stop_segments.popleft() if stop_segments else None
 
