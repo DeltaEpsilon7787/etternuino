@@ -1,3 +1,5 @@
+import functools
+
 DEFAULT_SAMPLE_RATE = 44100
 BYTE_FALSE = b'\x00'
 BYTE_TRUE = b'\x01'
@@ -25,3 +27,15 @@ SNAP_PINS = {
 def in_reduce(reduce_logic_func, sequence, inclusion_list) -> bool:
     """Using `reduce_logic_func` check if each element of `sequence` is in `inclusion_list`"""
     return reduce_logic_func(elmn in inclusion_list for elmn in sequence)
+
+
+def capture_exceptions(function):
+    @functools.wraps(function)
+    def decorator(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except Exception as E:
+            print(f'Exception occured in {function.__name__}: {E}')
+            return
+
+    return decorator

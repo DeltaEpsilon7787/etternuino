@@ -6,7 +6,6 @@ from operator import attrgetter, itemgetter
 from typing import List, Optional, Sequence, Set, Tuple
 
 import attr
-import easygui_qt
 import numpy as np
 import pydub
 import serial
@@ -16,59 +15,30 @@ from PyQt5 import QtCore, QtWidgets
 
 from basic_types import Time
 from chart_parser import Simfile, parse_simfile
+from chart_selection_ui import ChartSelectionDialog
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
-    SNAP_PINS, in_reduce
+    SNAP_PINS, capture_exceptions, in_reduce
 from rows import GlobalScheduledRow, GlobalTimedRow, Snap
 
 
-@attr.attrs(auto_attribs=True, cmp=False)
-class EtternuinoTimer:
-    _real_timer: QtCore.QElapsedTimer = attr.attrib(factory=QtCore.QElapsedTimer, init=False)
-    _is_paused: bool = True
-    _offset: int = 0
-
-    @QtCore.pyqtSlot()
-    def pause(self):
-        if not self._is_paused:
-            self._offset += self._real_timer.nsecsElapsed() / 1e9
-        self._is_paused = True
-
-    @QtCore.pyqtSlot()
-    def unpause(self):
-        self._is_paused = False
-        self._real_timer.start()
-
-    @property
-    def current_time(self):
-        if self._is_paused:
-            return self._offset
-
-        return (
-                self._real_timer.nsecsElapsed() / 1e9 + self._offset
-        )
-
-    @property
-    def is_paused(self):
-        return self._is_paused
-
-
 class Mixer(object):
-    def __init__(self, timer, data=np.zeros((60 * DEFAULT_SAMPLE_RATE, 2)), sample_rate=DEFAULT_SAMPLE_RATE):
-        self.timer = timer
+    def __init__(self, data=np.zeros((60 * DEFAULT_SAMPLE_RATE, 2)), sample_rate=DEFAULT_SAMPLE_RATE):
         self.data = data.copy()
         self.sample_rate = sample_rate
         self.current_frame = 0
+        self.muted = False
+        self.paused = False
 
     @classmethod
-    def from_file(cls, timer: EtternuinoTimer, source_file: str, sound_start: Time = 0):
+    def from_file(cls, source_file: str, sound_start: Time = 0):
         data, sample_rate = sf.read(source_file, dtype='float32')
-        mixer = cls(timer, data, sample_rate)
+        mixer = cls(data, sample_rate)
 
         if sound_start < 0:
             padded = np.zeros((mixer.sample_rate * abs(sound_start), mixer.data.shape[1]))
             mixer.data = np.concatenate((padded, mixer.data))
         else:
-            mixer.data = mixer.data[mixer.sample_rate * sound_start:]
+            mixer.data = mixer.data[int(mixer.sample_rate * sound_start):]
 
         return mixer
 
@@ -92,18 +62,20 @@ class Mixer(object):
             self.data[sample_start: sample_start + sound_data.shape[0]] *= 1 / max_volume
 
     def __call__(self, out_data: np.ndarray, frames: int, at_time, status: int):
-        sample_start = int(self.sample_rate * self.timer.current_time)
-
-        if np.abs(sample_start - self.current_frame) > frames * 100:
-            self.current_frame += sample_start - self.current_frame
-
         sample_start = self.current_frame
 
-        if sample_start + frames > self.data.shape[0] or self.timer.is_paused:
+        if sample_start + frames > self.data.shape[0] or self.paused:
             out_data.fill(0)
         else:
-            out_data[:] = self.data[sample_start:sample_start + frames]
+            if self.muted:
+                out_data.fill(0)
+            else:
+                out_data[:] = self.data[sample_start:sample_start + frames]
             self.current_frame += frames
+
+    @property
+    def current_time(self) -> Time:
+        return Time(Fraction(self.current_frame, self.sample_rate))
 
 
 class BaseClapMapper(Callable):
@@ -113,50 +85,55 @@ class BaseClapMapper(Callable):
 
 
 class ChartPlayer(QtCore.QObject):
+    start: QtCore.pyqtSignal = QtCore.pyqtSignal()
     on_start: QtCore.pyqtSignal = QtCore.pyqtSignal()
     on_end: QtCore.pyqtSignal = QtCore.pyqtSignal()
-    on_write: QtCore.pyqtSignal = QtCore.pyqtSignal()
+    on_write: QtCore.pyqtSignal = QtCore.pyqtSignal('char*')
 
     def __init__(self,
                  simfile: Simfile,
                  chart_num: int = 0,
                  sound_start_delta: Time = 0,
-                 arduino: Optional[serial.Serial] = None,
+                 arduino: Optional[str] = None,
                  music_out: bool = True,
                  clap_mapper: Optional[BaseClapMapper] = None):
         QtCore.QObject.__init__(self)
         self.simfile = simfile
         self.chart_num = chart_num
         self.sound_start_delta = sound_start_delta
-        self.arduino = arduino
+        self.arduino = arduino and serial.Serial(arduino)
+        self.arduino_muted = False
         self.music_out = music_out
         self.clap_mapper = clap_mapper
 
         self.mixer = None
         self.music_stream = None
 
-        self.timer = EtternuinoTimer()
+        pydub.AudioSegment.from_file(simfile.music).export('temp.wav', format='wav')
+        self.mixer = Mixer.from_file('temp.wav', self.sound_start_delta)
+        self.mixer.muted = not music_out
+        self.music_stream = sd.OutputStream(channels=2,
+                                            samplerate=DEFAULT_SAMPLE_RATE,
+                                            dtype='float32',
+                                            callback=self.mixer)
 
-        music = self.music_out and simfile.music
-        if music:
-            pydub.AudioSegment.from_file(simfile.music).export('temp.wav', format='wav')
-            self.mixer = Mixer.from_file(self.timer, 'temp.wav', self.sound_start_delta)
-        elif self.clap_mapper:
-            self.mixer = Mixer(self.timer)
+        self.microblink_duration = Fraction('0.01')
+        self.blink_duration = Fraction('0.06')
 
-        if self.mixer:
-            self.music_stream = sd.OutputStream(channels=2,
-                                                samplerate=DEFAULT_SAMPLE_RATE,
-                                                dtype='float32',
-                                                callback=self.mixer)
-
-        self.microblink_duration = Fraction('0.01') if self.arduino else 0
-        self.blink_duration = Fraction('0.06') if self.arduino else 0
+        self.need_to_die = False
+        self.start.connect(self.run)
 
     def wait_till(self, end_time: Time) -> None:
-        while self.timer.current_time < end_time:
+        while self.mixer.current_time < end_time:
             pass
 
+    def pause(self):
+        self.mixer.paused = True
+
+    def unpause(self):
+        self.mixer.paused = False
+
+    @capture_exceptions
     def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
         TURN_OFF = 0
         TURN_ON = 1
@@ -234,113 +211,243 @@ class ChartPlayer(QtCore.QObject):
         return state_sequence
 
     @QtCore.pyqtSlot()
-    def pause(self):
-        self.timer.pause()
-
-    @QtCore.pyqtSlot()
-    def unpause(self):
-        self.timer.unpause()
-
-    @QtCore.pyqtSlot()
+    @capture_exceptions
     def run(self):
         try:
-            try:
-                chart = self.simfile.charts[self.chart_num]
-            except IndexError:
+            chart = self.simfile.charts[self.chart_num]
+        except IndexError:
+            self.cleanup()
+            return
+
+        notes = sorted(chart.note_field)
+        notes = deque(
+            row
+            for row in notes
+            if not in_reduce(all, row.objects, ('0', 'M'))
+        )
+
+        self.on_start.emit()
+
+        if self.clap_mapper:
+            for row in notes:
+                self.mixer.add_sound(self.clap_mapper(row), row.time)
+
+        notes = deque(
+            GlobalScheduledRow.from_source(row, self.sound_start_delta)
+            for row in notes
+        )
+
+        first_note = notes[0]
+        sequence = self.schedule_events(notes)
+
+        self.music_stream and self.music_stream.start()
+        self.unpause()
+        self.wait_till(first_note.time)
+
+        for time_point, message in sequence:
+            self.wait_till(time_point)
+            self.on_write.emit(message)
+            self.arduino and not self.arduino_muted and self.arduino.write(message)
+            if self.need_to_die:
+                self.cleanup()
                 return
-
-            notes = sorted(chart.note_field)
-            notes = deque(
-                row
-                for row in notes
-                if not in_reduce(all, row.objects, ('0', 'M'))
-            )
-
-            self.on_start.emit()
-
-            if self.clap_mapper:
-                for row in notes:
-                    self.mixer.add_sound(self.clap_mapper(row), row.time)
-
-            notes = deque(
-                GlobalScheduledRow.from_source(row, self.sound_start_delta)
-                for row in notes
-            )
-
-            first_note = notes[0]
-            sequence = self.schedule_events(notes)
-
-            self.music_stream and self.music_stream.start()
-            self.unpause()
-            self.wait_till(first_note.time)
-
-            try:
-                for time_point, message in sequence:
-                    self.wait_till(time_point)
-                    self.on_write.emit(message)
-
-            except KeyboardInterrupt:
-                self.music_stream and self.music_stream.stop()
-                self.arduino and self.arduino.write(BYTE_FALSE * ARDUINO_MESSAGE_LENGTH)
-                self.on_end.emit()
-        except Exception as E:
-            print(E)
 
     @QtCore.pyqtSlot()
     def die(self):
-        raise KeyboardInterrupt
+        self.need_to_die = True
+
+    def cleanup(self):
+        self.music_stream and self.music_stream.stop()
+        self.arduino and self.arduino.write(BYTE_FALSE * ARDUINO_MESSAGE_LENGTH)
+        self.on_end.emit()
+
 
 class EtternuinoApp(QtWidgets.QMainWindow):
-    @QtCore.pyqtSlot()
-    def play_file(self):
-        sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(None, 'Choose SM file...', os.getcwd(), 'Simfiles (*.sm)')
-        if sm_file is None:
+    def __init__(self, *args, **kwargs):
+        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+        self.chart_selection = ChartSelectionDialog()
+        self.active_threads = []
+        self.setup_ui()
+
+        self.show()
+
+    def setup_ui(self):
+        self.setObjectName("etternuino_window")
+        self.resize(794, 416)
+        self.setWindowTitle("Etternuino")
+        self.main_widget = QtWidgets.QWidget(self)
+        self.main_widget.setObjectName("main_widget")
+        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.main_widget)
+        self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.lane_group = QtWidgets.QWidget(self.main_widget)
+        self.lane_group.setObjectName("lane_group")
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self.lane_group)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout.setObjectName("horizontalLayout")
+        self.lane_0 = QtWidgets.QFrame(self.lane_group)
+        self.lane_0.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.lane_0.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.lane_0.setObjectName("lane_0")
+        self.horizontalLayout.addWidget(self.lane_0)
+        self.lane_1 = QtWidgets.QFrame(self.lane_group)
+        self.lane_1.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.lane_1.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.lane_1.setObjectName("lane_1")
+        self.horizontalLayout.addWidget(self.lane_1)
+        self.lane_2 = QtWidgets.QFrame(self.lane_group)
+        self.lane_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.lane_2.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.lane_2.setObjectName("lane_2")
+        self.horizontalLayout.addWidget(self.lane_2)
+        self.lane_3 = QtWidgets.QFrame(self.lane_group)
+        self.lane_3.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.lane_3.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.lane_3.setObjectName("lane_3")
+        self.horizontalLayout.addWidget(self.lane_3)
+        self.verticalLayout_3.addWidget(self.lane_group)
+        self.checkbox_group = QtWidgets.QWidget(self.main_widget)
+        self.checkbox_group.setObjectName("checkbox_group")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.play_music_checkbox.setChecked(True)
+        self.play_music_checkbox.setObjectName("play_music_checkbox")
+        self.verticalLayout.addWidget(self.play_music_checkbox)
+        self.signal_arduino_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.signal_arduino_checkbox.setChecked(True)
+        self.signal_arduino_checkbox.setObjectName("signal_arduino_checkbox")
+        self.verticalLayout.addWidget(self.signal_arduino_checkbox)
+        self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.add_claps_checkbox.setObjectName("add_claps_checkbox")
+        self.verticalLayout.addWidget(self.add_claps_checkbox)
+        self.verticalLayout_3.addWidget(self.checkbox_group)
+        self.play_group = QtWidgets.QWidget(self.main_widget)
+        self.play_group.setObjectName("play_group")
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
+        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.play_file_btn = QtWidgets.QPushButton(self.play_group)
+        self.play_file_btn.setFlat(False)
+        self.play_file_btn.setObjectName("play_file_btn")
+        self.horizontalLayout_2.addWidget(self.play_file_btn)
+        self.verticalLayout_3.addWidget(self.play_group)
+        self.control_group = QtWidgets.QWidget(self.main_widget)
+        self.control_group.setObjectName("control_group")
+        self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
+        self.play_active_group.setContentsMargins(0, 0, 0, 0)
+        self.play_active_group.setObjectName("play_active_group")
+        self.pause_stop_group = QtWidgets.QWidget(self.control_group)
+        self.pause_stop_group.setEnabled(True)
+        self.pause_stop_group.setObjectName("pause_stop_group")
+        self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
+        self.ctrl_button_group.setContentsMargins(0, 0, 0, 0)
+        self.ctrl_button_group.setObjectName("ctrl_button_group")
+        self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.stop_btn.setObjectName("stop_btn")
+        self.ctrl_button_group.addWidget(self.stop_btn)
+        self.play_active_group.addWidget(self.pause_stop_group)
+        self.progress_bar = QtWidgets.QProgressBar(self.control_group)
+        self.progress_bar.setProperty("value", 0)
+        self.progress_bar.setFormat("%v")
+        self.progress_bar.setObjectName("progress_bar")
+        self.play_active_group.addWidget(self.progress_bar)
+        self.verticalLayout_3.addWidget(self.control_group)
+        self.setCentralWidget(self.main_widget)
+
+        self.retranslate_ui()
+        self.play_file_btn.clicked.connect(self.play_file)
+        self.stop_btn.clicked.connect(self.stop)
+        self.play_music_checkbox.toggled['bool'].connect(self.play_music)
+        self.signal_arduino_checkbox.toggled['bool'].connect(self.signal_arduino)
+        self.add_claps_checkbox.toggled['bool'].connect(self.add_claps)
+        QtCore.QMetaObject.connectSlotsByName(self)
+
+        self.set_control_group_visibility(False)
+
+    def retranslate_ui(self):
+        _translate = QtCore.QCoreApplication.translate
+        self.play_music_checkbox.setText(_translate("etternuino_window", "Play music"))
+        self.signal_arduino_checkbox.setText(_translate("etternuino_window", "Signal Arduino"))
+        self.add_claps_checkbox.setText(_translate("etternuino_window", "Add claps"))
+        self.play_file_btn.setText(_translate("etternuino_window", "Play file"))
+        self.stop_btn.setText(_translate("etternuino_window", "Stop"))
+
+    @QtCore.pyqtSlot('bool')
+    def set_control_group_visibility(self, state):
+        self.control_group.setVisible(state)
+
+    @QtCore.pyqtSlot('bool')
+    def set_play_group_visibility(self, state):
+        self.play_group.setVisible(state)
+
+    @capture_exceptions
+    def chart_selected(self, parsed_simfile, chart_num):
+        if chart_num < 0:
             return
-        parsed_simfile = parse_simfile(sm_file)
-        pick = easygui_qt.get_choice('Select what chart to play',
-                                     'Chart selection',
-                                     [
-                                         str(index) + ':' + str(parsed_simfile.charts[index].diff_name)
-                                         for index in range(len(parsed_simfile.charts))
-                                     ])
-        if pick is None:
-            return
-        chart_num = int(pick.split(':')[0])
-        try:
-            arduino_port = self.parent().signal_arduino_checkbox.isChecked() and serial.Serial('/dev/ttyUSB0',
-                                                                                               9600) or None
-            self.player = ChartPlayer(simfile=parsed_simfile,
-                                      chart_num=chart_num,
-                                      sound_start_delta=Time(Fraction(0, 1)),
-                                      arduino=arduino_port,
-                                      music_out=self.parent().play_music_checkbox.isChecked(),
-                                      clap_mapper=None)
-        except:
-            raise
-        finally:
-            arduino_port and arduino_port.close()
+        arduino_port = self.signal_arduino_checkbox.isChecked() and 'COM4' or None
+        self.player = ChartPlayer(
+            simfile=parsed_simfile, chart_num=chart_num,
+            sound_start_delta=Time(Fraction(0, 1)),
+            arduino=arduino_port,
+            music_out=self.play_music_checkbox.isChecked(),
+            clap_mapper=None
+        )
+        self.player.on_start.connect(lambda: self.set_play_group_visibility(False))
+        self.player.on_start.connect(lambda: self.set_control_group_visibility(True))
+        self.player.on_write.connect(self.interpret_message)
+        self.player.on_end.connect(lambda: self.set_play_group_visibility(True))
+        self.player.on_end.connect(lambda: self.set_control_group_visibility(False))
 
         player_thread = QtCore.QThread()
-        self.player.moveToThread(player_thread)
-        player_thread.started.connect(self.player.run)
         player_thread.start()
+        self.player.moveToThread(player_thread)
+        self.player.start.emit()
+        self.active_threads.append(player_thread)
+        self.player.on_end.connect(lambda: self.active_threads.remove(player_thread))
 
     @QtCore.pyqtSlot()
-    def pause(self):
-        pass
+    def play_file(self):
+        sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(None, 'Choose SM file...', os.getcwd(),
+                                                           'Simfiles (*.sm)')
+        if sm_file == "":
+            return
+        parsed_simfile = parse_simfile(sm_file)
+        self.chart_selection.chart_list.clear()
+        for index, chart in enumerate(parsed_simfile.charts, 1):
+            self.chart_selection.chart_list.addItem(f'{index}: {chart.diff_name}')
+        self.chart_selection.on_selection.connect(lambda chart_num: self.chart_selected(parsed_simfile, chart_num))
+        self.chart_selection.show()
 
     @QtCore.pyqtSlot()
     def stop(self):
-        pass
+        self.player.die()
 
     @QtCore.pyqtSlot('bool')
     def play_music(self, new_state):
-        pass
+        if not self.player:
+            return
+        self.player.mixer.muted = not new_state
 
     @QtCore.pyqtSlot('bool')
     def signal_arduino(self, new_state):
-        pass
+        if not self.player:
+            return
+        self.player.arduino_muted = not new_state
 
     @QtCore.pyqtSlot('bool')
     def add_claps(self, new_state):
         pass
+
+    @QtCore.pyqtSlot('char *')
+    def interpret_message(self, message):
+        pass
+
+
+if __name__ == "__main__":
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    the_app = EtternuinoApp()
+
+    sys.exit(app.exec_())
