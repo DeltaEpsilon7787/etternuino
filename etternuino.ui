@@ -7,14 +7,14 @@
                 <x>0</x>
                 <y>0</y>
                 <width>254</width>
-                <height>317</height>
+                <height>463</height>
             </rect>
         </property>
         <property name="windowTitle">
             <string notr="true">Etternuino</string>
         </property>
         <widget class="QWidget" name="main_widget">
-            <layout class="QVBoxLayout" name="verticalLayout_3">
+            <layout class="QVBoxLayout" name="verticalLayout_2">
                 <item>
                     <widget class="QWidget" name="lane_group" native="true">
                         <layout class="QHBoxLayout" name="horizontalLayout">
@@ -161,12 +161,89 @@
                                 </widget>
                             </item>
                             <item>
-                                <widget class="QProgressBar" name="progress_bar">
-                                    <property name="value">
+                                <widget class="QLabel" name="label_3">
+                                    <property name="text">
+                                        <string>Progress:</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QSlider" name="progress_slider">
+                                    <property name="maximum">
                                         <number>0</number>
                                     </property>
-                                    <property name="format">
-                                        <string notr="true">%v</string>
+                                    <property name="singleStep">
+                                        <number>4410</number>
+                                    </property>
+                                    <property name="pageStep">
+                                        <number>44100</number>
+                                    </property>
+                                    <property name="orientation">
+                                        <enum>Qt::Horizontal</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </widget>
+                </item>
+                <item>
+                    <widget class="QWidget" name="" native="true">
+                        <layout class="QHBoxLayout" name="control_sliders_group">
+                            <item>
+                                <widget class="QLabel" name="label">
+                                    <property name="text">
+                                        <string>Blink duration:</string>
+                                    </property>
+                                    <property name="alignment">
+                                        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QSlider" name="blink_duration_slider">
+                                    <property name="maximum">
+                                        <number>150</number>
+                                    </property>
+                                    <property name="pageStep">
+                                        <number>10</number>
+                                    </property>
+                                    <property name="value">
+                                        <number>50</number>
+                                    </property>
+                                    <property name="tracking">
+                                        <bool>true</bool>
+                                    </property>
+                                    <property name="orientation">
+                                        <enum>Qt::Vertical</enum>
+                                    </property>
+                                    <property name="invertedAppearance">
+                                        <bool>false</bool>
+                                    </property>
+                                    <property name="invertedControls">
+                                        <bool>false</bool>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QLabel" name="label_2">
+                                    <property name="text">
+                                        <string>Microblink duration</string>
+                                    </property>
+                                    <property name="alignment">
+                                        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QSlider" name="microblink_duration_slider">
+                                    <property name="maximum">
+                                        <number>50</number>
+                                    </property>
+                                    <property name="value">
+                                        <number>10</number>
+                                    </property>
+                                    <property name="orientation">
+                                        <enum>Qt::Vertical</enum>
                                     </property>
                                 </widget>
                             </item>
@@ -185,8 +262,8 @@
             <slot>play_file()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>127</x>
-                    <y>262</y>
+                    <x>145</x>
+                    <y>204</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>787</x>
@@ -201,8 +278,8 @@
             <slot>pause()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>78</x>
-                    <y>345</y>
+                    <x>101</x>
+                    <y>260</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>3</x>
@@ -217,8 +294,8 @@
             <slot>stop()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>50</x>
-                    <y>374</y>
+                    <x>77</x>
+                    <y>289</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>5</x>
@@ -233,8 +310,8 @@
             <slot>play_music()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>47</x>
-                    <y>131</y>
+                    <x>65</x>
+                    <y>109</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>3</x>
@@ -249,8 +326,8 @@
             <slot>signal_arduino()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>82</x>
-                    <y>153</y>
+                    <x>100</x>
+                    <y>133</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>5</x>
@@ -265,12 +342,60 @@
             <slot>add_claps()</slot>
             <hints>
                 <hint type="sourcelabel">
-                    <x>79</x>
-                    <y>189</y>
+                    <x>97</x>
+                    <y>157</y>
                 </hint>
                 <hint type="destinationlabel">
                     <x>1</x>
                     <y>222</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>blink_duration_slider</sender>
+            <signal>sliderMoved(int)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>change_blink_duration(int)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>117</x>
+                    <y>414</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>150</x>
+                    <y>458</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>microblink_duration_slider</sender>
+            <signal>sliderMoved(int)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>change_microblink_duration(int)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>237</x>
+                    <y>422</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>255</x>
+                    <y>415</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>progress_slider</sender>
+            <signal>sliderMoved(int)</signal>
+            <receiver>etternuino_window</receiver>
+            <slot>change_current_time(int)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>178</x>
+                    <y>261</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>252</x>
+                    <y>233</y>
                 </hint>
             </hints>
         </connection>
@@ -282,5 +407,8 @@
         <slot>play_music()</slot>
         <slot>signal_arduino()</slot>
         <slot>add_claps()</slot>
+        <slot>change_blink_duration(int)</slot>
+        <slot>change_microblink_duration(int)</slot>
+        <slot>change_current_time(int)</slot>
     </slots>
 </ui>

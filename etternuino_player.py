@@ -96,7 +96,8 @@ class ChartPlayer(QtCore.QObject):
                  sound_start_delta: Time = 0,
                  arduino: Optional[str] = None,
                  music_out: bool = True,
-                 clap_mapper: Optional[BaseClapMapper] = None):
+                 clap_mapper: Optional[BaseClapMapper] = None,
+                 progress_slider_output=None):
         QtCore.QObject.__init__(self)
         self.simfile = simfile
         self.chart_num = chart_num
@@ -121,11 +122,16 @@ class ChartPlayer(QtCore.QObject):
         self.blink_duration = Fraction('0.06')
 
         self.need_to_die = False
+        self.need_to_update_position = False
+        self.progress_slider_output = progress_slider_output
         self.start.connect(self.run)
 
     def wait_till(self, end_time: Time) -> None:
         while self.mixer.current_time < end_time:
-            pass
+            if self.progress_slider_output:
+                self.progress_slider_output.setValue(self.mixer.current_frame)
+            if self.need_to_update_position:
+                break
 
     def pause(self):
         self.mixer.paused = True
@@ -157,7 +163,7 @@ class ChartPlayer(QtCore.QObject):
             activated_pins = set()
             deactivated_pins = set()
 
-            if not in_reduce(all, row.objects, ('0', '3', '5')):
+            if not in_reduce(all, row.objects, ('0', '3', '5', 'M')):
                 deactivated_pins |= set(SNAP_PINS.values()) - set(row_snap.arduino_pins)
                 activated_pins |= set(row_snap.arduino_pins)
 
@@ -238,19 +244,30 @@ class ChartPlayer(QtCore.QObject):
         )
 
         first_note = notes[0]
-        sequence = self.schedule_events(notes)
+        sequence = list(self.schedule_events(notes))
 
         self.music_stream and self.music_stream.start()
         self.unpause()
         self.wait_till(first_note.time)
 
-        for time_point, message in sequence:
+        current_index = 0
+        while current_index < len(sequence):
+            time_point, message = sequence[current_index]
             self.wait_till(time_point)
             self.on_write.emit(message)
             self.arduino and not self.arduino_muted and self.arduino.write(message)
             if self.need_to_die:
                 self.cleanup()
                 return
+            if self.need_to_update_position:
+                current_index = [
+                    index
+                    for index, event in enumerate(sequence)
+                    if event[0] >= self.mixer.current_time
+                ][0]
+                self.need_to_update_position = False
+            current_index += 1
+
 
     @QtCore.pyqtSlot()
     def die(self):
@@ -272,43 +289,45 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.show()
 
     def setup_ui(self):
-        self.setObjectName("etternuino_window")
-        self.resize(794, 416)
+        self.setObjectName("self")
+        self.resize(254, 463)
         self.setWindowTitle("Etternuino")
         self.main_widget = QtWidgets.QWidget(self)
         self.main_widget.setObjectName("main_widget")
-        self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.main_widget)
-        self.verticalLayout_3.setObjectName("verticalLayout_3")
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.main_widget)
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.lane_group = QtWidgets.QWidget(self.main_widget)
         self.lane_group.setObjectName("lane_group")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.lane_group)
-        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.lane_0 = QtWidgets.QFrame(self.lane_group)
+        self.lane_0.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_0.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_0.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_0.setObjectName("lane_0")
         self.horizontalLayout.addWidget(self.lane_0)
         self.lane_1 = QtWidgets.QFrame(self.lane_group)
+        self.lane_1.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_1.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_1.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_1.setObjectName("lane_1")
         self.horizontalLayout.addWidget(self.lane_1)
         self.lane_2 = QtWidgets.QFrame(self.lane_group)
+        self.lane_2.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_2.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_2.setObjectName("lane_2")
         self.horizontalLayout.addWidget(self.lane_2)
         self.lane_3 = QtWidgets.QFrame(self.lane_group)
+        self.lane_3.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_3.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_3.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_3.setObjectName("lane_3")
         self.horizontalLayout.addWidget(self.lane_3)
-        self.verticalLayout_3.addWidget(self.lane_group)
+        self.verticalLayout_2.addWidget(self.lane_group)
         self.checkbox_group = QtWidgets.QWidget(self.main_widget)
         self.checkbox_group.setObjectName("checkbox_group")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
-        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.play_music_checkbox.setChecked(True)
@@ -321,57 +340,69 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.add_claps_checkbox.setObjectName("add_claps_checkbox")
         self.verticalLayout.addWidget(self.add_claps_checkbox)
-        self.verticalLayout_3.addWidget(self.checkbox_group)
+        self.verticalLayout_2.addWidget(self.checkbox_group)
         self.play_group = QtWidgets.QWidget(self.main_widget)
         self.play_group.setObjectName("play_group")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
-        self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.play_file_btn = QtWidgets.QPushButton(self.play_group)
         self.play_file_btn.setFlat(False)
         self.play_file_btn.setObjectName("play_file_btn")
         self.horizontalLayout_2.addWidget(self.play_file_btn)
-        self.verticalLayout_3.addWidget(self.play_group)
+        self.verticalLayout_2.addWidget(self.play_group)
         self.control_group = QtWidgets.QWidget(self.main_widget)
         self.control_group.setObjectName("control_group")
         self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
-        self.play_active_group.setContentsMargins(0, 0, 0, 0)
         self.play_active_group.setObjectName("play_active_group")
         self.pause_stop_group = QtWidgets.QWidget(self.control_group)
         self.pause_stop_group.setEnabled(True)
         self.pause_stop_group.setObjectName("pause_stop_group")
         self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
-        self.ctrl_button_group.setContentsMargins(0, 0, 0, 0)
         self.ctrl_button_group.setObjectName("ctrl_button_group")
+        self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.pause_btn.setObjectName("pause_btn")
+        self.ctrl_button_group.addWidget(self.pause_btn)
         self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.stop_btn.setObjectName("stop_btn")
         self.ctrl_button_group.addWidget(self.stop_btn)
         self.play_active_group.addWidget(self.pause_stop_group)
-        self.progress_bar = QtWidgets.QProgressBar(self.control_group)
-        self.progress_bar.setProperty("value", 0)
-        self.progress_bar.setFormat("%v")
-        self.progress_bar.setObjectName("progress_bar")
-        self.play_active_group.addWidget(self.progress_bar)
-        self.verticalLayout_3.addWidget(self.control_group)
+        self.label_3 = QtWidgets.QLabel(self.control_group)
+        self.label_3.setObjectName("label_3")
+        self.play_active_group.addWidget(self.label_3)
+        self.progress_slider = QtWidgets.QSlider(self.control_group)
+        self.progress_slider.setMaximum(0)
+        self.progress_slider.setSingleStep(4410)
+        self.progress_slider.setPageStep(44100)
+        self.progress_slider.setOrientation(QtCore.Qt.Horizontal)
+        self.progress_slider.setObjectName("progress_slider")
+        self.play_active_group.addWidget(self.progress_slider)
+        self.verticalLayout_2.addWidget(self.control_group)
+        self.widget = QtWidgets.QWidget(self.main_widget)
+        self.widget.setObjectName("widget")
         self.setCentralWidget(self.main_widget)
 
         self.retranslate_ui()
         self.play_file_btn.clicked.connect(self.play_file)
+        self.pause_btn.clicked.connect(self.pause)
         self.stop_btn.clicked.connect(self.stop)
         self.play_music_checkbox.toggled['bool'].connect(self.play_music)
         self.signal_arduino_checkbox.toggled['bool'].connect(self.signal_arduino)
         self.add_claps_checkbox.toggled['bool'].connect(self.add_claps)
+        self.progress_slider.sliderMoved['int'].connect(self.change_current_time)
+        self.progress_slider.sliderReleased.connect(self.update_player)
         QtCore.QMetaObject.connectSlotsByName(self)
 
         self.set_control_group_visibility(False)
 
     def retranslate_ui(self):
         _translate = QtCore.QCoreApplication.translate
-        self.play_music_checkbox.setText(_translate("etternuino_window", "Play music"))
-        self.signal_arduino_checkbox.setText(_translate("etternuino_window", "Signal Arduino"))
-        self.add_claps_checkbox.setText(_translate("etternuino_window", "Add claps"))
-        self.play_file_btn.setText(_translate("etternuino_window", "Play file"))
-        self.stop_btn.setText(_translate("etternuino_window", "Stop"))
+        self.play_music_checkbox.setText(_translate("self", "Play music"))
+        self.signal_arduino_checkbox.setText(_translate("self", "Signal Arduino"))
+        self.add_claps_checkbox.setText(_translate("self", "Add claps"))
+        self.play_file_btn.setText(_translate("self", "Play file"))
+        self.pause_btn.setText(_translate("self", "Pause"))
+        self.stop_btn.setText(_translate("self", "Stop"))
+        self.label_3.setText(_translate("self", "Progress:"))
 
     @QtCore.pyqtSlot('bool')
     def set_control_group_visibility(self, state):
@@ -380,6 +411,15 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot('bool')
     def set_play_group_visibility(self, state):
         self.play_group.setVisible(state)
+
+    @QtCore.pyqtSlot('int')
+    def change_current_time(self, new_value):
+        if self.player:
+            self.player.mixer.current_frame = new_value
+
+    @QtCore.pyqtSlot()
+    def update_player(self):
+        self.player.need_to_update_position = True
 
     @capture_exceptions
     def chart_selected(self, parsed_simfile, chart_num):
@@ -391,8 +431,14 @@ class EtternuinoApp(QtWidgets.QMainWindow):
             sound_start_delta=Time(Fraction(0, 1)),
             arduino=arduino_port,
             music_out=self.play_music_checkbox.isChecked(),
-            clap_mapper=None
+            clap_mapper=None,
+            progress_slider_output=self.progress_slider
         )
+
+        self.progress_slider.setMaximum(self.player.mixer.data.shape[0])
+        self.progress_slider.setValue(0)
+
+
         self.player.on_start.connect(lambda: self.set_play_group_visibility(False))
         self.player.on_start.connect(lambda: self.set_control_group_visibility(True))
         self.player.on_write.connect(self.interpret_message)
@@ -406,6 +452,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.active_threads.append(player_thread)
         self.player.on_end.connect(lambda: self.active_threads.remove(player_thread))
 
+
     @QtCore.pyqtSlot()
     def play_file(self):
         sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(None, 'Choose SM file...', os.getcwd(),
@@ -418,6 +465,14 @@ class EtternuinoApp(QtWidgets.QMainWindow):
             self.chart_selection.chart_list.addItem(f'{index}: {chart.diff_name}')
         self.chart_selection.on_selection.connect(lambda chart_num: self.chart_selected(parsed_simfile, chart_num))
         self.chart_selection.show()
+
+    @QtCore.pyqtSlot()
+    def pause(self):
+        self.player and self.player.pause()
+
+    @QtCore.pyqtSlot()
+    def unpause(self):
+        self.player and self.player.unpause()
 
     @QtCore.pyqtSlot()
     def stop(self):
