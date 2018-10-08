@@ -13,6 +13,7 @@ import sounddevice as sd
 import soundfile as sf
 from PyQt5 import QtCore, QtWidgets
 
+from arduino_dialog import VirtualArduino
 from basic_types import Time
 from chart_parser import Simfile, parse_simfile
 from chart_selection_ui import ChartSelectionDialog
@@ -130,8 +131,9 @@ class ChartPlayer(QtCore.QObject):
         while self.mixer.current_time < end_time:
             if self.progress_slider_output:
                 self.progress_slider_output.setValue(self.mixer.current_frame)
-            if self.need_to_update_position:
+            if self.need_to_update_position or self.need_to_die:
                 break
+            sd.sleep(1)
 
     def pause(self):
         self.mixer.paused = True
@@ -268,6 +270,8 @@ class ChartPlayer(QtCore.QObject):
                 self.need_to_update_position = False
             current_index += 1
 
+        self.on_end.emit()
+
 
     @QtCore.pyqtSlot()
     def die(self):
@@ -283,6 +287,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
         self.chart_selection = ChartSelectionDialog()
+        self.virtual_arduino = VirtualArduino()
         self.active_threads = []
         self.setup_ui()
 
@@ -362,6 +367,10 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.pause_btn.setObjectName("pause_btn")
         self.ctrl_button_group.addWidget(self.pause_btn)
+        self.unpause_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.unpause_btn.setObjectName("unpause_btn")
+        self.unpause_btn.setVisible(False)
+        self.ctrl_button_group.addWidget(self.unpause_btn)
         self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.stop_btn.setObjectName("stop_btn")
         self.ctrl_button_group.addWidget(self.stop_btn)
@@ -384,6 +393,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.retranslate_ui()
         self.play_file_btn.clicked.connect(self.play_file)
         self.pause_btn.clicked.connect(self.pause)
+        self.unpause_btn.clicked.connect(self.unpause)
         self.stop_btn.clicked.connect(self.stop)
         self.play_music_checkbox.toggled['bool'].connect(self.play_music)
         self.signal_arduino_checkbox.toggled['bool'].connect(self.signal_arduino)
@@ -401,6 +411,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.add_claps_checkbox.setText(_translate("self", "Add claps"))
         self.play_file_btn.setText(_translate("self", "Play file"))
         self.pause_btn.setText(_translate("self", "Pause"))
+        self.unpause_btn.setText(_translate("self", "Unpause"))
         self.stop_btn.setText(_translate("self", "Stop"))
         self.label_3.setText(_translate("self", "Progress:"))
 
@@ -425,7 +436,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     def chart_selected(self, parsed_simfile, chart_num):
         if chart_num < 0:
             return
-        arduino_port = self.signal_arduino_checkbox.isChecked() and 'COM4' or None
+        arduino_port = self.signal_arduino_checkbox.isChecked() and '/dev/ttyUSB0' or None
         self.player = ChartPlayer(
             simfile=parsed_simfile, chart_num=chart_num,
             sound_start_delta=Time(Fraction(0, 1)),
@@ -441,9 +452,11 @@ class EtternuinoApp(QtWidgets.QMainWindow):
 
         self.player.on_start.connect(lambda: self.set_play_group_visibility(False))
         self.player.on_start.connect(lambda: self.set_control_group_visibility(True))
+        self.player.on_start.connect(lambda: self.virtual_arduino.show())
         self.player.on_write.connect(self.interpret_message)
         self.player.on_end.connect(lambda: self.set_play_group_visibility(True))
         self.player.on_end.connect(lambda: self.set_control_group_visibility(False))
+        self.player.on_end.connect(lambda: self.virtual_arduino.close())
 
         player_thread = QtCore.QThread()
         player_thread.start()
@@ -454,8 +467,9 @@ class EtternuinoApp(QtWidgets.QMainWindow):
 
 
     @QtCore.pyqtSlot()
+    @capture_exceptions
     def play_file(self):
-        sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(None, 'Choose SM file...', os.getcwd(),
+        sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose SM file...', os.getcwd(),
                                                            'Simfiles (*.sm)')
         if sm_file == "":
             return
@@ -469,10 +483,14 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot()
     def pause(self):
         self.player and self.player.pause()
+        self.unpause_btn.setVisible(True)
+        self.pause_btn.setVisible(False)
 
     @QtCore.pyqtSlot()
     def unpause(self):
         self.player and self.player.unpause()
+        self.unpause_btn.setVisible(False)
+        self.pause_btn.setVisible(True)
 
     @QtCore.pyqtSlot()
     def stop(self):
@@ -494,9 +512,27 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     def add_claps(self, new_state):
         pass
 
-    @QtCore.pyqtSlot('char *')
+    @QtCore.pyqtSlot('char*')
+    @capture_exceptions
     def interpret_message(self, message):
-        pass
+        self.virtual_arduino.toggle_lanes(
+            (message[LANE_PINS[0]] and 1 or 0) * 1 << 0 +
+            (message[LANE_PINS[1]] and 1 or 0) * 1 << 1 +
+            (message[LANE_PINS[2]] and 1 or 0) * 1 << 2 +
+            (message[LANE_PINS[3]] and 1 or 0) * 1 << 3
+        )
+
+        self.virtual_arduino.toogle_snap([
+            snap
+            for snap in [
+                message[SNAP_PINS[4]] and 4 or None,
+                message[SNAP_PINS[8]] and 8 or None,
+                message[SNAP_PINS[12]] and 12 or None,
+                message[SNAP_PINS[16]] and 16 or None,
+                message[SNAP_PINS[24]] and 24 or None
+            ]
+            if snap is not None
+        ])
 
 
 if __name__ == "__main__":
