@@ -25,6 +25,7 @@ class ChartInfoEntry:
     local_counters: List[int] = attrib(factory=lambda: [0] * 4)
     global_nps: int = attrib(default=0)
 
+
 class VirtualArduino(QtWidgets.QDialog):
     chart_info: List[ChartInfoEntry] = None
     current_info: int = None
@@ -53,6 +54,7 @@ class VirtualArduino(QtWidgets.QDialog):
         self.blink_dial = QtWidgets.QDial(self.horizontalWidget)
         self.global_dial = QtWidgets.QDial(self.horizontalWidget)
 
+        self.chart = None
         self.chart_info = []
         self.safe_lanes = set()
         self.lane_activation_times = [0] * 4
@@ -331,7 +333,7 @@ class VirtualArduino(QtWidgets.QDialog):
             self.handle_event(None)
 
     @capture_exceptions
-    def set_color(self, lane_index, lane, r, g, b):
+    def set_color(self, lane_index: int, lane, r, g, b):
         palette = lane.palette()
         role = lane.backgroundRole()
         palette.setColor(role, QtGui.QColor(r, g, b, 255))
