@@ -6,155 +6,276 @@
             <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>400</width>
-                <height>339</height>
+                <width>613</width>
+                <height>553</height>
             </rect>
         </property>
         <property name="windowTitle">
-            <string>Dialog</string>
+            <string>Visuterna</string>
         </property>
-        <layout class="QVBoxLayout" name="verticalLayout">
+        <layout class="QVBoxLayout" name="verticalLayout_2">
             <item>
-                <layout class="QGridLayout" name="gridLayout">
-                    <item row="0" column="0">
-                        <widget class="QFrame" name="l1">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="2">
-                        <widget class="QFrame" name="l3">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="1">
-                        <widget class="QFrame" name="l2">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="3">
-                        <widget class="QFrame" name="l4">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                </layout>
+                <widget class="QFrame" name="frame">
+                    <property name="frameShape">
+                        <enum>QFrame::StyledPanel</enum>
+                    </property>
+                    <property name="frameShadow">
+                        <enum>QFrame::Raised</enum>
+                    </property>
+                    <layout class="QHBoxLayout" name="horizontalLayout_3">
+                        <item>
+                            <widget class="QProgressBar" name="l1_nps">
+                                <property name="maximumSize">
+                                    <size>
+                                        <width>50</width>
+                                        <height>400</height>
+                                    </size>
+                                </property>
+                                <property name="maximum">
+                                    <number>10</number>
+                                </property>
+                                <property name="value">
+                                    <number>5</number>
+                                </property>
+                                <property name="textVisible">
+                                    <bool>true</bool>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Vertical</enum>
+                                </property>
+                                <property name="textDirection">
+                                    <enum>QProgressBar::TopToBottom</enum>
+                                </property>
+                                <property name="format">
+                                    <string notr="true">%v / %m</string>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <widget class="QProgressBar" name="l2_nps">
+                                <property name="maximumSize">
+                                    <size>
+                                        <width>50</width>
+                                        <height>400</height>
+                                    </size>
+                                </property>
+                                <property name="maximum">
+                                    <number>10</number>
+                                </property>
+                                <property name="value">
+                                    <number>5</number>
+                                </property>
+                                <property name="textVisible">
+                                    <bool>true</bool>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Vertical</enum>
+                                </property>
+                                <property name="textDirection">
+                                    <enum>QProgressBar::TopToBottom</enum>
+                                </property>
+                                <property name="format">
+                                    <string notr="true">%v / %m</string>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <widget class="QProgressBar" name="l3_nps">
+                                <property name="maximumSize">
+                                    <size>
+                                        <width>50</width>
+                                        <height>400</height>
+                                    </size>
+                                </property>
+                                <property name="maximum">
+                                    <number>10</number>
+                                </property>
+                                <property name="value">
+                                    <number>5</number>
+                                </property>
+                                <property name="textVisible">
+                                    <bool>true</bool>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Vertical</enum>
+                                </property>
+                                <property name="invertedAppearance">
+                                    <bool>false</bool>
+                                </property>
+                                <property name="textDirection">
+                                    <enum>QProgressBar::TopToBottom</enum>
+                                </property>
+                                <property name="format">
+                                    <string notr="true">%v</string>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <widget class="QProgressBar" name="l4_nps">
+                                <property name="maximumSize">
+                                    <size>
+                                        <width>50</width>
+                                        <height>400</height>
+                                    </size>
+                                </property>
+                                <property name="maximum">
+                                    <number>10</number>
+                                </property>
+                                <property name="value">
+                                    <number>5</number>
+                                </property>
+                                <property name="textVisible">
+                                    <bool>true</bool>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Vertical</enum>
+                                </property>
+                                <property name="textDirection">
+                                    <enum>QProgressBar::TopToBottom</enum>
+                                </property>
+                                <property name="format">
+                                    <string notr="true">%v / %m</string>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <layout class="QVBoxLayout" name="verticalLayout">
+                                <item>
+                                    <layout class="QHBoxLayout" name="horizontalLayout_2">
+                                        <item>
+                                            <widget class="QFrame" name="l1">
+                                                <property name="minimumSize">
+                                                    <size>
+                                                        <width>100</width>
+                                                        <height>100</height>
+                                                    </size>
+                                                </property>
+                                                <property name="autoFillBackground">
+                                                    <bool>true</bool>
+                                                </property>
+                                                <property name="frameShape">
+                                                    <enum>QFrame::StyledPanel</enum>
+                                                </property>
+                                                <property name="frameShadow">
+                                                    <enum>QFrame::Raised</enum>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                        <item>
+                                            <widget class="QFrame" name="l2">
+                                                <property name="minimumSize">
+                                                    <size>
+                                                        <width>100</width>
+                                                        <height>100</height>
+                                                    </size>
+                                                </property>
+                                                <property name="autoFillBackground">
+                                                    <bool>true</bool>
+                                                </property>
+                                                <property name="frameShape">
+                                                    <enum>QFrame::StyledPanel</enum>
+                                                </property>
+                                                <property name="frameShadow">
+                                                    <enum>QFrame::Raised</enum>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                        <item>
+                                            <widget class="QFrame" name="l3">
+                                                <property name="minimumSize">
+                                                    <size>
+                                                        <width>100</width>
+                                                        <height>100</height>
+                                                    </size>
+                                                </property>
+                                                <property name="autoFillBackground">
+                                                    <bool>true</bool>
+                                                </property>
+                                                <property name="frameShape">
+                                                    <enum>QFrame::StyledPanel</enum>
+                                                </property>
+                                                <property name="frameShadow">
+                                                    <enum>QFrame::Raised</enum>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                        <item>
+                                            <widget class="QFrame" name="l4">
+                                                <property name="minimumSize">
+                                                    <size>
+                                                        <width>100</width>
+                                                        <height>100</height>
+                                                    </size>
+                                                </property>
+                                                <property name="autoFillBackground">
+                                                    <bool>true</bool>
+                                                </property>
+                                                <property name="frameShape">
+                                                    <enum>QFrame::StyledPanel</enum>
+                                                </property>
+                                                <property name="frameShadow">
+                                                    <enum>QFrame::Raised</enum>
+                                                </property>
+                                            </widget>
+                                        </item>
+                                    </layout>
+                                </item>
+                            </layout>
+                        </item>
+                        <item>
+                            <widget class="QProgressBar" name="l_nps">
+                                <property name="maximum">
+                                    <number>10</number>
+                                </property>
+                                <property name="value">
+                                    <number>5</number>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Vertical</enum>
+                                </property>
+                                <property name="textDirection">
+                                    <enum>QProgressBar::TopToBottom</enum>
+                                </property>
+                                <property name="format">
+                                    <string notr="true">%v / %m</string>
+                                </property>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
             </item>
             <item>
-                <layout class="QHBoxLayout" name="horizontalLayout">
-                    <item>
-                        <widget class="QFrame" name="frame_6">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item>
-                        <widget class="QFrame" name="s24">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item>
-                        <widget class="QFrame" name="s24_2">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item>
-                        <widget class="QFrame" name="s12">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item>
-                        <widget class="QFrame" name="s12_2">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item>
-                        <widget class="QFrame" name="frame">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                </layout>
-            </item>
-            <item>
-                <layout class="QGridLayout" name="gridLayout_2">
-                    <item row="0" column="2">
-                        <widget class="QFrame" name="s8th">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="1">
-                        <widget class="QFrame" name="s16">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                    <item row="0" column="0">
-                        <widget class="QFrame" name="s4th">
-                            <property name="frameShape">
-                                <enum>QFrame::StyledPanel</enum>
-                            </property>
-                            <property name="frameShadow">
-                                <enum>QFrame::Raised</enum>
-                            </property>
-                        </widget>
-                    </item>
-                </layout>
+                <widget class="QWidget" name="horizontalWidget" native="true">
+                    <layout class="QHBoxLayout" name="horizontalLayout">
+                        <item>
+                            <widget class="QDial" name="local_dial">
+                                <property name="maximum">
+                                    <number>20</number>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <widget class="QDial" name="blink_dial">
+                                <property name="maximum">
+                                    <number>100</number>
+                                </property>
+                                <property name="singleStep">
+                                    <number>1</number>
+                                </property>
+                                <property name="orientation">
+                                    <enum>Qt::Horizontal</enum>
+                                </property>
+                            </widget>
+                        </item>
+                        <item>
+                            <widget class="QDial" name="global_dial">
+                                <property name="maximum">
+                                    <number>60</number>
+                                </property>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
             </item>
         </layout>
     </widget>

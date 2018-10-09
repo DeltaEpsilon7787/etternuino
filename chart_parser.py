@@ -1,3 +1,4 @@
+import io
 import operator as op
 import os
 import re
@@ -78,21 +79,16 @@ class AugmentedChart(object):
 
 
 @attrs(cmp=False)
-class FileContents(object):
-    contents: bytes = attrib(repr=False)
-
-
-@attrs(cmp=False)
 class Simfile(object):
     title: str = attrib(default="")
     subtitle: str = attrib(default="")
     artist: str = attrib(default="")
     genre: str = attrib(default="")
     credit: str = attrib(default="")
-    music: Optional[FileContents] = attrib(default=None)
-    banner: Optional[FileContents] = attrib(default=None)
-    bg: Optional[FileContents] = attrib(default=None)
-    cdtitle: Optional[FileContents] = attrib(default=None)
+    music: Optional[io.BufferedReader] = attrib(default=None)
+    banner: Optional[io.BufferedReader] = attrib(default=None)
+    bg: Optional[io.BufferedReader] = attrib(default=None)
+    cdtitle: Optional[io.BufferedReader] = attrib(default=None)
     sample_start: Time = attrib(default=0)
     sample_length: Time = attrib(default=10)
     display_bpm: str = '*'
@@ -134,6 +130,10 @@ class ChartTransformer(lark.Transformer):
             return PureChart(*map(ChartTransformer.extract_first, tokens[:3]), tokens[4])
         except IndexError:
             return PureChart('', *map(ChartTransformer.extract_first, tokens[:2]), tokens[3])
+
+    @staticmethod
+    def unsafe_file(tokens):
+        return open(tokens[0], mode='rb')
 
     @staticmethod
     def safe_file(tokens):

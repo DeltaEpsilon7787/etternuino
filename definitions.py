@@ -29,13 +29,13 @@ def in_reduce(reduce_logic_func, sequence, inclusion_list) -> bool:
     return reduce_logic_func(elmn in inclusion_list for elmn in sequence)
 
 
-def capture_exceptions(function):
-    @functools.wraps(function)
+def capture_exceptions(func):
+    @functools.wraps(func)
     def decorator(*args, **kwargs):
         try:
-            return function(*args, **kwargs)
+            return func(*args, **kwargs)
         except Exception as E:
-            print(f'Exception occured in {function.__name__}: {E}')
+            print(f'Exception occured in {func.__name__}: {E}')
             return
 
     return decorator

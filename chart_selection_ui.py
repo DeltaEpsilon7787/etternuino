@@ -1,11 +1,4 @@
 # -*- coding: utf-8 -*-
-
-# Form implementation generated from reading ui file 'chart_selection.ui'
-#
-# Created by: PyQt5 UI code generator 5.6
-#
-# WARNING! All changes made in this file will be lost!
-
 from PyQt5 import QtCore, QtWidgets
 
 from definitions import capture_exceptions
@@ -18,6 +11,10 @@ class ChartSelectionDialog(QtWidgets.QDialog):
     @capture_exceptions
     def __init__(self, *args, **kwargs):
         QtWidgets.QDialog.__init__(self, *args, **kwargs)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self)
+        self.verticalLayout = QtWidgets.QVBoxLayout()
+        self.chart_list = QtWidgets.QListWidget(self)
+        self.dialog_box = QtWidgets.QDialogButtonBox(self)
         self.setup_ui()
 
         self.dialog_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(
@@ -35,14 +32,10 @@ class ChartSelectionDialog(QtWidgets.QDialog):
     def setup_ui(self):
         self.setObjectName("ChartSelectionDialog")
         self.resize(400, 300)
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.verticalLayout = QtWidgets.QVBoxLayout()
         self.verticalLayout.setObjectName("verticalLayout")
-        self.chart_list = QtWidgets.QListWidget(self)
         self.chart_list.setObjectName("chart_list")
         self.verticalLayout.addWidget(self.chart_list)
-        self.dialog_box = QtWidgets.QDialogButtonBox(self)
         self.dialog_box.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
         self.dialog_box.setObjectName("dialog_box")
         self.verticalLayout.addWidget(self.dialog_box)
