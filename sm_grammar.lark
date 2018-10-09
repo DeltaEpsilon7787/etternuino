@@ -16,7 +16,7 @@ true: "YES"
 false: "NO"
 phrase: NO_SEMICOLON_SENTENCE
 no_colon_phrase: NO_COLON_SENTENCE
-file: NO_SEMICOLON_SENTENCE
+unsafe_file: NO_SEMICOLON_SENTENCE
 safe_file: NO_SEMICOLON_SENTENCE
 float: SIGNED_NUMBER
 int: INT
@@ -34,7 +34,7 @@ meta:
 | "#BANNER:" [safe_file] -> banner
 | "#BACKGROUND:" [safe_file] -> bg
 | "#CDTITLE:" [safe_file] -> cdtitle
-| "#MUSIC:" [file] -> music
+| "#MUSIC:" [unsafe_file] -> music
 | "#OFFSET:" [float] -> offset
 | "#SAMPLESTART:" [float] -> sample_start
 | "#SAMPLELENGTH:" [float] -> sample_length

@@ -5,145 +5,189 @@
 # Created by: PyQt5 UI code generator 5.6
 #
 # WARNING! All changes made in this file will be lost!
+from typing import List
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt5 import QtCore, QtGui, QtWidgets
+from attr import attrs, attrib
 
-from definitions import capture_exceptions
+from basic_types import NoteObjects, Time
+from definitions import capture_exceptions, BYTE_TRUE, BYTE_FALSE
+from itertools import chain
 
+from rows import GlobalScheduledRow, Snap
+
+@attrs
+class ChartInfoEntry:
+    time: Time = attrib()
+    snap: Snap = attrib()
+    objects: NoteObjects = attrib()
+    local_nps: List[float] = attrib(factory=lambda: [0] * 4)
+    local_counters: List[int] = attrib(factory=lambda: [0] * 4)
+    global_nps: float = attrib(default=0)
 
 class VirtualArduino(QtWidgets.QDialog):
     def __init__(self, *args, **kwargs):
-        QtWidgets.QDialog.__init__(self, *args, **kwargs)
+        QtWidgets.QDialog.__init__(*args, **kwargs)
+
+        self.setObjectName("Dialog")
+        self.resize(597, 520)
+        self.horizontalLayout = QtWidgets.QHBoxLayout(self)
+        self.frame = QtWidgets.QFrame(self)
+        self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.frame)
+        self.l1_nps = QtWidgets.QProgressBar(self.frame)
+        self.l2_nps = QtWidgets.QProgressBar(self.frame)
+        self.l3_nps = QtWidgets.QProgressBar(self.frame)
+        self.l4_nps = QtWidgets.QProgressBar(self.frame)
+        self.verticalLayout = QtWidgets.QVBoxLayout()
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
+        self.l1 = QtWidgets.QFrame(self.frame)
+        self.l2 = QtWidgets.QFrame(self.frame)
+        self.l3 = QtWidgets.QFrame(self.frame)
+        self.l4 = QtWidgets.QFrame(self.frame)
+        self.l_nps = QtWidgets.QProgressBar(self.frame)
+
+        self.chart_info = []
+
         self.setup_ui()
 
     def setup_ui(self):
-        self.setObjectName("Dialog")
-        self.resize(400, 339)
-        self.verticalLayout = QtWidgets.QVBoxLayout(self)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.gridLayout = QtWidgets.QGridLayout()
-        self.gridLayout.setObjectName("gridLayout")
-        self.l1 = QtWidgets.QFrame(self)
-        self.l1.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.l1.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.l1.setObjectName("l1")
-        self.gridLayout.addWidget(self.l1, 0, 0, 1, 1)
-        self.l3 = QtWidgets.QFrame(self)
-        self.l3.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.l3.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.l3.setObjectName("l3")
-        self.gridLayout.addWidget(self.l3, 0, 2, 1, 1)
-        self.l2 = QtWidgets.QFrame(self)
-        self.l2.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.l2.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.l2.setObjectName("l2")
-        self.gridLayout.addWidget(self.l2, 0, 1, 1, 1)
-        self.l4 = QtWidgets.QFrame(self)
-        self.l4.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.l4.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.l4.setObjectName("l4")
-        self.gridLayout.addWidget(self.l4, 0, 3, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.frame_6 = QtWidgets.QFrame(self)
-        self.frame_6.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.frame_6.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.frame_6.setObjectName("frame_6")
-        self.horizontalLayout.addWidget(self.frame_6)
-        self.s24 = QtWidgets.QFrame(self)
-        self.s24.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s24.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s24.setObjectName("s24")
-        self.horizontalLayout.addWidget(self.s24)
-        self.s24_2 = QtWidgets.QFrame(self)
-        self.s24_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s24_2.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s24_2.setObjectName("s24_2")
-        self.horizontalLayout.addWidget(self.s24_2)
-        self.s12 = QtWidgets.QFrame(self)
-        self.s12.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s12.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s12.setObjectName("s12")
-        self.horizontalLayout.addWidget(self.s12)
-        self.s12_2 = QtWidgets.QFrame(self)
-        self.s12_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s12_2.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s12_2.setObjectName("s12_2")
-        self.horizontalLayout.addWidget(self.s12_2)
-        self.frame = QtWidgets.QFrame(self)
         self.frame.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.frame.setFrameShadow(QtWidgets.QFrame.Raised)
         self.frame.setObjectName("frame")
+        self.horizontalLayout_3.setObjectName("horizontalLayout_3")
+        self.l1_nps.setMaximumSize(QtCore.QSize(50, 400))
+        self.l1_nps.setMaximum(10)
+        self.l1_nps.setProperty("value", 5)
+        self.l1_nps.setTextVisible(True)
+        self.l1_nps.setOrientation(QtCore.Qt.Vertical)
+        self.l1_nps.setTextDirection(QtWidgets.QProgressBar.TopToBottom)
+        self.l1_nps.setFormat("%v / %m")
+        self.l1_nps.setObjectName("l1_nps")
+        self.horizontalLayout_3.addWidget(self.l1_nps)
+        self.l2_nps.setMaximumSize(QtCore.QSize(50, 400))
+        self.l2_nps.setMaximum(10)
+        self.l2_nps.setProperty("value", 5)
+        self.l2_nps.setTextVisible(True)
+        self.l2_nps.setOrientation(QtCore.Qt.Vertical)
+        self.l2_nps.setTextDirection(QtWidgets.QProgressBar.TopToBottom)
+        self.l2_nps.setFormat("%v / %m")
+        self.l2_nps.setObjectName("l2_nps")
+        self.horizontalLayout_3.addWidget(self.l2_nps)
+        self.l3_nps.setMaximumSize(QtCore.QSize(50, 400))
+        self.l3_nps.setMaximum(10)
+        self.l3_nps.setProperty("value", 5)
+        self.l3_nps.setTextVisible(True)
+        self.l3_nps.setOrientation(QtCore.Qt.Vertical)
+        self.l3_nps.setInvertedAppearance(False)
+        self.l3_nps.setTextDirection(QtWidgets.QProgressBar.TopToBottom)
+        self.l3_nps.setFormat("%v")
+        self.l3_nps.setObjectName("l3_nps")
+        self.horizontalLayout_3.addWidget(self.l3_nps)
+        self.l4_nps.setMaximumSize(QtCore.QSize(50, 400))
+        self.l4_nps.setMaximum(10)
+        self.l4_nps.setProperty("value", 5)
+        self.l4_nps.setTextVisible(True)
+        self.l4_nps.setOrientation(QtCore.Qt.Vertical)
+        self.l4_nps.setTextDirection(QtWidgets.QProgressBar.TopToBottom)
+        self.l4_nps.setFormat("%v / %m")
+        self.l4_nps.setObjectName("l4_nps")
+        self.horizontalLayout_3.addWidget(self.l4_nps)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.l1.setMinimumSize(QtCore.QSize(100, 100))
+        self.l1.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.l1.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.l1.setObjectName("l1")
+        self.horizontalLayout_2.addWidget(self.l1)
+        self.l2.setMinimumSize(QtCore.QSize(100, 100))
+        self.l2.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.l2.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.l2.setObjectName("l2")
+        self.horizontalLayout_2.addWidget(self.l2)
+        self.l3.setMinimumSize(QtCore.QSize(100, 100))
+        self.l3.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.l3.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.l3.setObjectName("l3")
+        self.horizontalLayout_2.addWidget(self.l3)
+        self.l4.setMinimumSize(QtCore.QSize(100, 100))
+        self.l4.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.l4.setFrameShadow(QtWidgets.QFrame.Raised)
+        self.l4.setObjectName("l4")
+        self.horizontalLayout_2.addWidget(self.l4)
+        self.verticalLayout.addLayout(self.horizontalLayout_2)
+        self.horizontalLayout_3.addLayout(self.verticalLayout)
+        self.l_nps.setMaximum(10)
+        self.l_nps.setProperty("value", 5)
+        self.l_nps.setOrientation(QtCore.Qt.Vertical)
+        self.l_nps.setTextDirection(QtWidgets.QProgressBar.TopToBottom)
+        self.l_nps.setFormat("%v / %m")
+        self.l_nps.setObjectName("l_nps")
+        self.horizontalLayout_3.addWidget(self.l_nps)
         self.horizontalLayout.addWidget(self.frame)
-        self.verticalLayout.addLayout(self.horizontalLayout)
-        self.gridLayout_2 = QtWidgets.QGridLayout()
-        self.gridLayout_2.setObjectName("gridLayout_2")
-        self.s8 = QtWidgets.QFrame(self)
-        self.s8.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s8.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s8.setObjectName("s8th")
-        self.gridLayout_2.addWidget(self.s8, 0, 2, 1, 1)
-        self.s16 = QtWidgets.QFrame(self)
-        self.s16.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s16.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s16.setObjectName("s16")
-        self.gridLayout_2.addWidget(self.s16, 0, 1, 1, 1)
-        self.s4 = QtWidgets.QFrame(self)
-        self.s4.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.s4.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.s4.setObjectName("s4th")
-        self.gridLayout_2.addWidget(self.s4, 0, 0, 1, 1)
-        self.verticalLayout.addLayout(self.gridLayout_2)
 
-        self.snaps = {
-            4: [self.s4],
-            8: [self.s8],
-            12: [self.s12, self.s12_2],
-            16: [self.s16],
-            24: [self.s24, self.s24_2]
-        }
-        self.all_snaps = [self.s4,
-                          self.s8,
-                          self.s12, self.s12_2,
-                          self.s16,
-                          self.s24, self.s24_2]
-        self.retranslate_ui()
+        _translate = QtCore.QCoreApplication.translate
+        self.setWindowTitle(_translate("Dialog", "Visuterna"))
+
         QtCore.QMetaObject.connectSlotsByName(self)
 
-    def retranslate_ui(self):
-        _translate = QtCore.QCoreApplication.translate
-        self.setWindowTitle(_translate("Dialog", "Virtual Arduino"))
-
+    @QtCore.pyqtSlot()
     @capture_exceptions
-    def toggle_lanes(self, bitcode):
-        self.l1.setStyleSheet(bitcode & 1 and 'rgb(0, 0, 0)' or '')
-        self.l2.setStyleSheet(bitcode & 2 and 'rgb(0, 0, 0)' or '')
-        self.l3.setStyleSheet(bitcode & 4 and 'rgb(0, 0, 0)' or '')
-        self.l4.setStyleSheet(bitcode & 8 and 'rgb(0, 0, 0)' or '')
+    def analyze_chart(self, chart: List[GlobalScheduledRow]):
+        global_timing_points = [
+            note.time
+            for note in chart
+        ]
 
-    @capture_exceptions
-    def toogle_snap(self, snap_values):
-        for snap in self.all_snaps:
-            snap.setStyleSheet('')
+        global_nps = [0]
+        for prev_note, new_note in zip(chart[:-1], chart[1:]):
+            global_nps.append((new_note.time - prev_note.time)**-1)
 
-        def set_snap_color(condition, r, g, b):
-            if set(snap_values) != set(condition):
-                return
+        local_nps_storage = []
+        local_counter_storage = []
+        for lane in range(4):
+            filtered_chart = list(reversed([
+                note
+                for note in chart
+                if note.objects[lane] in ('1', '2', '4')
+            ]))
+            timing_copy = global_timing_points.copy()
 
-            for this_snap_value in snap_values:
-                for snap in self.snaps[this_snap_value]:
-                    snap.setStyleSheet(f'rgb({r}, {g}, {b});')
-            return True
+            last_nps = 0
+            last_counter = 0
+            local_nps = [0]
+            local_counter = [0]
+            for prev_note, new_note in filtered_chart:
+                while timing_copy and timing_copy[-1].time < new_note.time:
+                    local_nps.append(last_nps)
+                    local_counter.append(last_counter)
+                    timing_copy.pop()
+                last_nps = (new_note.time - prev_note.time)**-1
+                local_nps.append(last_nps)
+                last_counter += 1
+                local_counter.append(last_counter)
 
-        set_snap_color([4], 255, 0, 0)
-        set_snap_color([12], 120, 0, 255)
-        set_snap_color([8], 0, 0, 255)
-        set_snap_color([16], 255, 255, 0)
-        set_snap_color([24], 255, 120, 255)
-        set_snap_color([4, 8], 255, 120, 0)
-        set_snap_color([4, 12], 0, 255, 255)
-        set_snap_color([4, 16], 0, 255, 0)
-        set_snap_color([8, 12], 120, 120, 120)
-        set_snap_color([8, 16], 120, 120, 120)
-        set_snap_color([12, 16], 120, 120, 120)
+            local_nps_storage.append(local_nps)
+            local_counter_storage.append(local_counter)
+
+        local_nps_storage = list(zip(*local_nps_storage))
+
+        full_data = []
+        for timing_point, global_nps_point, local_nps_point, local_counter_point, row in zip(global_timing_points,
+                                                                                             global_nps,
+                                                                                             local_nps_storage,
+                                                                                             local_counter_storage,
+                                                                                             chart):
+            full_data.append(
+                ChartInfoEntry(
+                    timing_point,
+                    Snap.from_row(row),
+                    row.objects,
+                    local_nps_point, local_counter_point,
+                    global_nps_point
+                )
+            )
+
+    @QtCore.pyqtSlot(Time)
+    def rewind_to(self, timing_point):
+        pass

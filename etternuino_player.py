@@ -10,73 +10,16 @@ import numpy as np
 import pydub
 import serial
 import sounddevice as sd
-import soundfile as sf
 from PyQt5 import QtCore, QtWidgets
 
 from arduino_dialog import VirtualArduino
 from basic_types import Time
-from chart_parser import Simfile, parse_simfile
+from chart_parser import Simfile, parse_simfile, AugmentedChart
 from chart_selection_ui import ChartSelectionDialog
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
     SNAP_PINS, capture_exceptions, in_reduce
+from mixer import Mixer
 from rows import GlobalScheduledRow, GlobalTimedRow, Snap
-
-
-class Mixer(object):
-    def __init__(self, data=np.zeros((60 * DEFAULT_SAMPLE_RATE, 2)), sample_rate=DEFAULT_SAMPLE_RATE):
-        self.data = data.copy()
-        self.sample_rate = sample_rate
-        self.current_frame = 0
-        self.muted = False
-        self.paused = False
-
-    @classmethod
-    def from_file(cls, source_file: str, sound_start: Time = 0):
-        data, sample_rate = sf.read(source_file, dtype='float32')
-        mixer = cls(data, sample_rate)
-
-        if sound_start < 0:
-            padded = np.zeros((mixer.sample_rate * abs(sound_start), mixer.data.shape[1]))
-            mixer.data = np.concatenate((padded, mixer.data))
-        else:
-            mixer.data = mixer.data[int(mixer.sample_rate * sound_start):]
-
-        return mixer
-
-    def add_sound(self, sound_data: np.ndarray, at_time: Time):
-        sample_start = int(self.sample_rate * at_time)
-        if sample_start + sound_data.shape[0] >= self.data.shape[0]:
-            offset = sample_start + sound_data.shape[0] - self.data.shape[0]
-            self.data = np.pad(
-                self.data,
-                (
-                    (0, offset),
-                    (0, 0)
-                ),
-                'constant'
-            )
-        self.data[sample_start: sample_start + sound_data.shape[0]] += sound_data
-
-        max_volume = np.max(self.data[sample_start: sample_start + sound_data.shape[0]],
-                            axis=0)[0]
-        if max_volume > 1:
-            self.data[sample_start: sample_start + sound_data.shape[0]] *= 1 / max_volume
-
-    def __call__(self, out_data: np.ndarray, frames: int, at_time, status: int):
-        sample_start = self.current_frame
-
-        if sample_start + frames > self.data.shape[0] or self.paused:
-            out_data.fill(0)
-        else:
-            if self.muted:
-                out_data.fill(0)
-            else:
-                out_data[:] = self.data[sample_start:sample_start + frames]
-            self.current_frame += frames
-
-    @property
-    def current_time(self) -> Time:
-        return Time(Fraction(self.current_frame, self.sample_rate))
 
 
 class BaseClapMapper(Callable):
@@ -86,10 +29,10 @@ class BaseClapMapper(Callable):
 
 
 class ChartPlayer(QtCore.QObject):
-    start: QtCore.pyqtSignal = QtCore.pyqtSignal()
+    chart_obtained: QtCore.pyqtSignal = QtCore.pyqtSignal(object)
     on_start: QtCore.pyqtSignal = QtCore.pyqtSignal()
     on_end: QtCore.pyqtSignal = QtCore.pyqtSignal()
-    on_write: QtCore.pyqtSignal = QtCore.pyqtSignal('char*')
+    time_arrived: QtCore.pyqtSignal = QtCore.pyqtSignal(Time)
 
     def __init__(self,
                  simfile: Simfile,
@@ -105,7 +48,6 @@ class ChartPlayer(QtCore.QObject):
         self.sound_start_delta = sound_start_delta
         self.arduino = arduino and serial.Serial(arduino)
         self.arduino_muted = False
-        self.music_out = music_out
         self.clap_mapper = clap_mapper
 
         self.mixer = None
@@ -143,9 +85,9 @@ class ChartPlayer(QtCore.QObject):
 
     @capture_exceptions
     def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
-        TURN_OFF = 0
-        TURN_ON = 1
-        TURN_ON_AND_BLINK = 2
+        turn_off = 0
+        turn_on = 1
+        turn_on_and_blink = 2
 
         @attr.attrs
         class NoteEvent(object):
@@ -186,17 +128,17 @@ class ChartPlayer(QtCore.QObject):
                 if row_time - last_row_time < self.blink_duration:
                     events.append(
                         NoteEvent(pin,
-                                  TURN_OFF,
+                                  turn_off,
                                   row_time - self.microblink_duration))
 
                 events.append(
                     NoteEvent(pin,
-                              TURN_ON_AND_BLINK if pin not in hold_pins else TURN_ON,
+                              turn_on_and_blink if pin not in hold_pins else turn_on,
                               row_time)
                 )
 
             for pin in deactivated_pins:
-                events.append(NoteEvent(pin, TURN_OFF, row_time))
+                events.append(NoteEvent(pin, turn_off, row_time))
 
             last_row_time = row_time
 
@@ -207,8 +149,8 @@ class ChartPlayer(QtCore.QObject):
             sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
             blink_sequence = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
             for event in event_group:
-                sequence[event.pin] = BYTE_TRUE if event.state in (TURN_ON, TURN_ON_AND_BLINK) else BYTE_FALSE
-                blink_sequence[event.pin] = BYTE_FALSE if event.state is TURN_ON_AND_BLINK else BYTE_UNCHANGED
+                sequence[event.pin] = BYTE_TRUE if event.state in (turn_on, turn_on_and_blink) else BYTE_FALSE
+                blink_sequence[event.pin] = BYTE_FALSE if event.state is turn_on_and_blink else BYTE_UNCHANGED
 
             if not in_reduce(all, blink_sequence, (BYTE_UNCHANGED,)):
                 state_sequence.append((Time(time_point + self.blink_duration), b''.join(blink_sequence)))
@@ -245,6 +187,8 @@ class ChartPlayer(QtCore.QObject):
             for row in notes
         )
 
+        self.chart_obtained.emit(notes)
+
         first_note = notes[0]
         sequence = list(self.schedule_events(notes))
 
@@ -256,7 +200,7 @@ class ChartPlayer(QtCore.QObject):
         while current_index < len(sequence):
             time_point, message = sequence[current_index]
             self.wait_till(time_point)
-            self.on_write.emit(message)
+            self.time_arrived.emit(time_point)
             self.arduino and not self.arduino_muted and self.arduino.write(message)
             if self.need_to_die:
                 self.cleanup()
@@ -272,113 +216,125 @@ class ChartPlayer(QtCore.QObject):
 
         self.on_end.emit()
 
-
     @QtCore.pyqtSlot()
     def die(self):
         self.need_to_die = True
 
     def cleanup(self):
         self.music_stream and self.music_stream.stop()
-        self.arduino and self.arduino.write(BYTE_FALSE * ARDUINO_MESSAGE_LENGTH)
         self.on_end.emit()
+        self.disconnect()
 
 
 class EtternuinoApp(QtWidgets.QMainWindow):
     def __init__(self, *args, **kwargs):
         QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
-        self.chart_selection = ChartSelectionDialog()
-        self.virtual_arduino = VirtualArduino()
-        self.active_threads = []
-        self.setup_ui()
 
-        self.show()
-
-    def setup_ui(self):
         self.setObjectName("self")
         self.resize(254, 463)
         self.setWindowTitle("Etternuino")
         self.main_widget = QtWidgets.QWidget(self)
-        self.main_widget.setObjectName("main_widget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.main_widget)
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.lane_group = QtWidgets.QWidget(self.main_widget)
-        self.lane_group.setObjectName("lane_group")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.lane_group)
-        self.horizontalLayout.setObjectName("horizontalLayout")
         self.lane_0 = QtWidgets.QFrame(self.lane_group)
+        self.lane_1 = QtWidgets.QFrame(self.lane_group)
+        self.lane_2 = QtWidgets.QFrame(self.lane_group)
+        self.lane_3 = QtWidgets.QFrame(self.lane_group)
+        self.checkbox_group = QtWidgets.QWidget(self.main_widget)
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
+        self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.signal_arduino_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
+        self.play_group = QtWidgets.QWidget(self.main_widget)
+        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
+        self.play_file_btn = QtWidgets.QPushButton(self.play_group)
+        self.control_group = QtWidgets.QWidget(self.main_widget)
+        self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
+        self.pause_stop_group = QtWidgets.QWidget(self.control_group)
+        self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
+        self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.unpause_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
+        self.label_3 = QtWidgets.QLabel(self.control_group)
+        self.progress_slider = QtWidgets.QSlider(self.control_group)
+        self.widget = QtWidgets.QWidget(self.main_widget)
+
+        self.chart_selection = ChartSelectionDialog()
+        self.virtual_arduino = VirtualArduino()
+        self.active_threads = []
+        self.player = None
+        self.arduino = None
+        self.setup_ui()
+
+        try:
+            self.arduino = serial.Serial('COM4')
+        except serial.SerialException:
+            try:
+                self.arduino = serial.Serial('/dev/ttyUSB0')
+            except serial.SerialException:
+                self.signal_arduino_checkbox.setVisible(False)
+
+        self.show()
+
+    def setup_ui(self):
+        self.main_widget.setObjectName("main_widget")
+        self.verticalLayout_2.setObjectName("verticalLayout_2")
+        self.lane_group.setObjectName("lane_group")
+        self.horizontalLayout.setObjectName("horizontalLayout")
         self.lane_0.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_0.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_0.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_0.setObjectName("lane_0")
         self.horizontalLayout.addWidget(self.lane_0)
-        self.lane_1 = QtWidgets.QFrame(self.lane_group)
         self.lane_1.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_1.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_1.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_1.setObjectName("lane_1")
         self.horizontalLayout.addWidget(self.lane_1)
-        self.lane_2 = QtWidgets.QFrame(self.lane_group)
         self.lane_2.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_2.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_2.setObjectName("lane_2")
         self.horizontalLayout.addWidget(self.lane_2)
-        self.lane_3 = QtWidgets.QFrame(self.lane_group)
         self.lane_3.setMinimumSize(QtCore.QSize(50, 50))
         self.lane_3.setFrameShape(QtWidgets.QFrame.StyledPanel)
         self.lane_3.setFrameShadow(QtWidgets.QFrame.Raised)
         self.lane_3.setObjectName("lane_3")
         self.horizontalLayout.addWidget(self.lane_3)
         self.verticalLayout_2.addWidget(self.lane_group)
-        self.checkbox_group = QtWidgets.QWidget(self.main_widget)
         self.checkbox_group.setObjectName("checkbox_group")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
         self.verticalLayout.setObjectName("verticalLayout")
-        self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.play_music_checkbox.setChecked(True)
         self.play_music_checkbox.setObjectName("play_music_checkbox")
         self.verticalLayout.addWidget(self.play_music_checkbox)
-        self.signal_arduino_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.signal_arduino_checkbox.setChecked(True)
         self.signal_arduino_checkbox.setObjectName("signal_arduino_checkbox")
         self.verticalLayout.addWidget(self.signal_arduino_checkbox)
-        self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
         self.add_claps_checkbox.setObjectName("add_claps_checkbox")
         self.verticalLayout.addWidget(self.add_claps_checkbox)
         self.verticalLayout_2.addWidget(self.checkbox_group)
-        self.play_group = QtWidgets.QWidget(self.main_widget)
         self.play_group.setObjectName("play_group")
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.play_file_btn = QtWidgets.QPushButton(self.play_group)
         self.play_file_btn.setFlat(False)
         self.play_file_btn.setObjectName("play_file_btn")
         self.horizontalLayout_2.addWidget(self.play_file_btn)
         self.verticalLayout_2.addWidget(self.play_group)
-        self.control_group = QtWidgets.QWidget(self.main_widget)
         self.control_group.setObjectName("control_group")
-        self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
         self.play_active_group.setObjectName("play_active_group")
-        self.pause_stop_group = QtWidgets.QWidget(self.control_group)
         self.pause_stop_group.setEnabled(True)
         self.pause_stop_group.setObjectName("pause_stop_group")
-        self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
         self.ctrl_button_group.setObjectName("ctrl_button_group")
-        self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.pause_btn.setObjectName("pause_btn")
         self.ctrl_button_group.addWidget(self.pause_btn)
-        self.unpause_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.unpause_btn.setObjectName("unpause_btn")
         self.unpause_btn.setVisible(False)
         self.ctrl_button_group.addWidget(self.unpause_btn)
-        self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
         self.stop_btn.setObjectName("stop_btn")
         self.ctrl_button_group.addWidget(self.stop_btn)
         self.play_active_group.addWidget(self.pause_stop_group)
-        self.label_3 = QtWidgets.QLabel(self.control_group)
         self.label_3.setObjectName("label_3")
         self.play_active_group.addWidget(self.label_3)
-        self.progress_slider = QtWidgets.QSlider(self.control_group)
         self.progress_slider.setMaximum(0)
         self.progress_slider.setSingleStep(4410)
         self.progress_slider.setPageStep(44100)
@@ -386,7 +342,6 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.progress_slider.setObjectName("progress_slider")
         self.play_active_group.addWidget(self.progress_slider)
         self.verticalLayout_2.addWidget(self.control_group)
-        self.widget = QtWidgets.QWidget(self.main_widget)
         self.widget.setObjectName("widget")
         self.setCentralWidget(self.main_widget)
 
@@ -415,15 +370,15 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.stop_btn.setText(_translate("self", "Stop"))
         self.label_3.setText(_translate("self", "Progress:"))
 
-    @QtCore.pyqtSlot('bool')
+    @QtCore.pyqtSlot(bool)
     def set_control_group_visibility(self, state):
         self.control_group.setVisible(state)
 
-    @QtCore.pyqtSlot('bool')
+    @QtCore.pyqtSlot(bool)
     def set_play_group_visibility(self, state):
         self.play_group.setVisible(state)
 
-    @QtCore.pyqtSlot('int')
+    @QtCore.pyqtSlot(int)
     def change_current_time(self, new_value):
         if self.player:
             self.player.mixer.current_frame = new_value
@@ -436,11 +391,10 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     def chart_selected(self, parsed_simfile, chart_num):
         if chart_num < 0:
             return
-        arduino_port = self.signal_arduino_checkbox.isChecked() and '/dev/ttyUSB0' or None
         self.player = ChartPlayer(
             simfile=parsed_simfile, chart_num=chart_num,
             sound_start_delta=Time(Fraction(0, 1)),
-            arduino=arduino_port,
+            arduino=self.arduino,
             music_out=self.play_music_checkbox.isChecked(),
             clap_mapper=None,
             progress_slider_output=self.progress_slider
@@ -449,14 +403,16 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.progress_slider.setMaximum(self.player.mixer.data.shape[0])
         self.progress_slider.setValue(0)
 
-
         self.player.on_start.connect(lambda: self.set_play_group_visibility(False))
         self.player.on_start.connect(lambda: self.set_control_group_visibility(True))
-        self.player.on_start.connect(lambda: self.virtual_arduino.show())
-        self.player.on_write.connect(self.interpret_message)
+        self.player.on_start.connect(self.virtual_arduino.show)
+
+        self.player.chart_obtained.connect(self.virtual_arduino.analyze_chart)
+        self.player.time_arrived.connect(self.virtual_arduino.rewind_to)
+
         self.player.on_end.connect(lambda: self.set_play_group_visibility(True))
         self.player.on_end.connect(lambda: self.set_control_group_visibility(False))
-        self.player.on_end.connect(lambda: self.virtual_arduino.close())
+        self.player.on_end.connect(self.virtual_arduino.close)
 
         player_thread = QtCore.QThread()
         player_thread.start()
@@ -464,7 +420,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         self.player.start.emit()
         self.active_threads.append(player_thread)
         self.player.on_end.connect(lambda: self.active_threads.remove(player_thread))
-
+        self.player.on_end.connect(self.cleanup)
 
     @QtCore.pyqtSlot()
     @capture_exceptions
@@ -478,6 +434,7 @@ class EtternuinoApp(QtWidgets.QMainWindow):
         for index, chart in enumerate(parsed_simfile.charts, 1):
             self.chart_selection.chart_list.addItem(f'{index}: {chart.diff_name}')
         self.chart_selection.on_selection.connect(lambda chart_num: self.chart_selected(parsed_simfile, chart_num))
+        self.chart_selection.on_cancel.connect(self.cleanup)
         self.chart_selection.show()
 
     @QtCore.pyqtSlot()
@@ -496,40 +453,44 @@ class EtternuinoApp(QtWidgets.QMainWindow):
     def stop(self):
         self.player.die()
 
-    @QtCore.pyqtSlot('bool')
+    @QtCore.pyqtSlot()
+    def cleanup(self):
+        if self.chart_selection:
+            self.chart_selection.on_selection.disconnect()
+            self.chart_selection.on_cancel.disconnect()
+        if self.player:
+            self.player.cleanup()
+        if self.arduino:
+            self.arduino.write(BYTE_FALSE * ARDUINO_MESSAGE_LENGTH)
+
+    @QtCore.pyqtSlot(bool)
     def play_music(self, new_state):
         if not self.player:
             return
         self.player.mixer.muted = not new_state
 
-    @QtCore.pyqtSlot('bool')
+    @QtCore.pyqtSlot(bool)
     def signal_arduino(self, new_state):
         if not self.player:
             return
         self.player.arduino_muted = not new_state
 
-    @QtCore.pyqtSlot('bool')
+    @QtCore.pyqtSlot(bool)
     def add_claps(self, new_state):
         pass
 
-    @QtCore.pyqtSlot('char*')
+    @QtCore.pyqtSlot(bytes)
     @capture_exceptions
-    def interpret_message(self, message):
-        self.virtual_arduino.toggle_lanes(
-            (message[LANE_PINS[0]] and 1 or 0) * 1 << 0 +
-            (message[LANE_PINS[1]] and 1 or 0) * 1 << 1 +
-            (message[LANE_PINS[2]] and 1 or 0) * 1 << 2 +
-            (message[LANE_PINS[3]] and 1 or 0) * 1 << 3
-        )
+    def interpret_message(self, message: bytes):
+        if in_reduce(all, message, (BYTE_UNCHANGED,)):
+            return
 
+        self.virtual_arduino.toggle_lanes([message[LANE_PINS[i]] for i in range(4)])
         self.virtual_arduino.toogle_snap([
             snap
             for snap in [
-                message[SNAP_PINS[4]] and 4 or None,
-                message[SNAP_PINS[8]] and 8 or None,
-                message[SNAP_PINS[12]] and 12 or None,
-                message[SNAP_PINS[16]] and 16 or None,
-                message[SNAP_PINS[24]] and 24 or None
+                message[SNAP_PINS[possible_snap]] and possible_snap or None
+                for possible_snap in [4, 8, 12, 16, 24]
             ]
             if snap is not None
         ])
