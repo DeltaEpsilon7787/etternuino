@@ -20,8 +20,6 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
         self.player = None
         self.arduino = None
 
-        from serial.tools import list_ports
-        list_ports
         self.show()
 
     @QtCore.pyqtSlot(int)

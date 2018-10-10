@@ -13,7 +13,7 @@ class PureRow(object):
 
 
 @attrs(cmp=True)
-class LocalRow(object):
+class LocalRow(PureRow):
     objects: NoteObjects = attrib(cmp=False)
     pos: LocalPosition = attrib(cmp=True)
 
@@ -24,7 +24,7 @@ class LocalRow(object):
 
 
 @attrs(cmp=True)
-class GlobalRow(object):
+class GlobalRow(LocalRow):
     objects: NoteObjects = attrib(cmp=False)
     pos: GlobalPosition = attrib(cmp=True)
 
@@ -35,14 +35,14 @@ class GlobalRow(object):
 
 
 @attrs(cmp=True)
-class GlobalTimedRow(object):
+class GlobalTimedRow(GlobalRow):
     objects: NoteObjects = attrib(cmp=False)
     pos: GlobalPosition = attrib(cmp=False)
     time: Time = attrib(cmp=True)
 
 
 @attrs(cmp=True)
-class GlobalScheduledRow(object):
+class GlobalScheduledRow(GlobalTimedRow):
     objects: NoteObjects = attrib(cmp=False)
     pos: GlobalPosition = attrib(cmp=False)
     time: Time = attrib(cmp=True)
