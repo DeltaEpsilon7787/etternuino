@@ -7,8 +7,10 @@ from fractions import Fraction
 from typing import List, Optional
 
 import lark
+from PyQt5 import QtCore
 from attr import Factory, attrib, attrs
 
+from definitions import capture_exceptions
 from simfile_parsing.basic_types import NoteObjects, Time
 from simfile_parsing.complex_types import MeasureMeasurePair, MeasureValuePair
 from simfile_parsing.rows import GlobalRow, GlobalTimedRow, LocalRow, PureRow
@@ -206,26 +208,36 @@ class ChartTransformer(lark.Transformer):
     file = safe_file
 
 
-def parse_simfile(file_path) -> Simfile:
-    sm_transformer = ChartTransformer()
+class SimfileParser(QtCore.QObject):
+    parse_simfile = QtCore.pyqtSignal(str)
+    simfile_parsed = QtCore.pyqtSignal(object)
 
-    this_dir = os.getcwd()
+    def __init__(self):
+        super().__init__(self)
+        self.parse_simfile.connect(self._parse_simfile)
 
-    with open(file_path, encoding='utf-8', errors='ignore') as chart:
-        lines = chart.readlines()
+    @QtCore.pyqtSlot(str)
+    @capture_exceptions
+    def _parse_simfile(self, file_path):
+        sm_transformer = ChartTransformer()
 
-    chart = []
-    for line in lines:
-        chart.append(re.sub(r'(//.*$)', '', line))
+        this_dir = os.getcwd()
 
-    chart = ''.join(chart)
-    try:
-        sm_parser = lark.Lark.open('sm_grammar.lark', parser='lalr', transformer=sm_transformer, start='simfile')
-        os.chdir(os.path.dirname(file_path))
-        parsed_chart = sm_parser.parse(chart)
-    except Exception:
-        raise
-    finally:
-        os.chdir(this_dir)
+        with open(file_path, encoding='utf-8', errors='ignore') as chart:
+            lines = chart.readlines()
 
-    return parsed_chart
+        chart = []
+        for line in lines:
+            chart.append(re.sub(r'(//.*$)', '', line))
+
+        chart = ''.join(chart)
+        try:
+            sm_parser = lark.Lark.open('sm_grammar.lark', parser='lalr', transformer=sm_transformer, start='simfile')
+            os.chdir(os.path.dirname(file_path))
+            parsed_chart = sm_parser.parse(chart)
+        except Exception:
+            raise
+        finally:
+            os.chdir(this_dir)
+
+        self.simfile_parsed.emit(parsed_chart)

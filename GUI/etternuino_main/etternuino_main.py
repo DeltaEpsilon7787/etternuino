@@ -4,11 +4,11 @@ from fractions import Fraction
 from PyQt5 import QtCore, QtWidgets
 
 from GUI.etternuino_main.etternuino_gui import Ui_etternuino_window
+from GUI.visuterna_window.visuterna_window import VisuternaWindow
 from chart_player import ChartPlayer
-from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_UNCHANGED, LANE_PINS, \
-    SNAP_PINS, capture_exceptions, in_reduce
+from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, capture_exceptions
 from simfile_parsing.basic_types import Time
-from simfile_parsing.chart_parser import parse_simfile
+from simfile_parsing.simfile_parser import SimfileParser
 
 
 class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
@@ -16,55 +16,19 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
         super().__init__(self)
         self.setup_ui()
 
-        self.active_threads = []
-        self.player = None
+        self.player: ChartPlayer = None
         self.arduino = None
+        self.visuterna_window: VisuternaWindow = None
 
         self.show()
 
     @QtCore.pyqtSlot(int)
     def change_current_time(self, new_value):
-        if self.player:
-            self.player.mixer.current_frame = new_value
+        self.player.mixer.current_frame = new_value
 
     @QtCore.pyqtSlot()
     def update_player(self):
         self.player.need_to_update_position = True
-
-    @capture_exceptions
-    def chart_selected(self, parsed_simfile, chart_num):
-        if chart_num < 0:
-            return
-        self.player = ChartPlayer(
-            simfile=parsed_simfile, chart_num=chart_num,
-            sound_start_delta=Time(Fraction(0, 1)),
-            arduino=self.arduino,
-            music_out=self.play_music_checkbox.isChecked(),
-            clap_mapper=None,
-            progress_slider_output=self.progress_slider
-        )
-
-        self.progress_slider.setMaximum(self.player.mixer.data.shape[0])
-        self.progress_slider.setValue(0)
-
-        self.player.on_start.connect(lambda: self.set_play_group_visibility(False))
-        self.player.on_start.connect(lambda: self.set_control_group_visibility(True))
-        self.player.on_start.connect(self.virtual_arduino.show)
-
-        self.player.chart_obtained.connect(self.virtual_arduino.analyze_chart)
-        self.player.time_arrived.connect(self.virtual_arduino.rewind_to)
-
-        self.player.on_end.connect(lambda: self.set_play_group_visibility(True))
-        self.player.on_end.connect(lambda: self.set_control_group_visibility(False))
-        self.player.on_end.connect(self.virtual_arduino.close)
-
-        player_thread = QtCore.QThread()
-        player_thread.start()
-        self.player.moveToThread(player_thread)
-        self.player.start.emit()
-        self.active_threads.append(player_thread)
-        self.player.on_end.connect(lambda: self.active_threads.remove(player_thread))
-        self.player.on_end.connect(self.cleanup)
 
     @QtCore.pyqtSlot()
     @capture_exceptions
@@ -73,13 +37,52 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
                                                            'Simfiles (*.sm)')
         if sm_file == "":
             return
-        parsed_simfile = parse_simfile(sm_file)
+
+        simfile_parser = SimfileParser()
+        parsing_thread = QtCore.QThread()
+        simfile_parser.moveToThread(parsing_thread)
+        simfile_parser.simfile_parsed.connect(self.select_chart)
+        simfile_parser.parse_simfile.emit(sm_file)
+        parsing_thread.start()
+
+    @QtCore.pyqtSlot(object)
+    def select_chart(self, parsed_simfile):
         self.chart_selection.chart_list.clear()
         for index, chart in enumerate(parsed_simfile.charts, 1):
             self.chart_selection.chart_list.addItem(f'{index}: {chart.diff_name}')
         self.chart_selection.on_selection.connect(lambda chart_num: self.chart_selected(parsed_simfile, chart_num))
         self.chart_selection.on_cancel.connect(self.cleanup)
         self.chart_selection.show()
+
+    @QtCore.pyqtSlot(object)
+    def open_visuterna(self):
+        self.visuterna_window = VisuternaWindow(4)
+        self.player.on_write.connect(self.visuterna_window.receive_event)
+        self.player.on_end.connect(self.visuterna_window.close)
+        self.visuterna_window.show()
+
+    @capture_exceptions
+    def chart_selected(self, parsed_simfile, chart_num):
+        if chart_num < 0:
+            return
+
+        chart = parsed_simfile.charts[chart_num]
+
+        self.player = ChartPlayer(
+            chart=chart,
+            audio=parsed_simfile.music,
+            sound_start_delta=Time(Fraction(0, 1)),
+            arduino=self.arduino,
+            clap_mapper=None,
+        )
+
+        self.player.on_start.connect(self.open_visuterna)
+
+        player_thread = QtCore.QThread()
+        self.player.moveToThread(player_thread)
+        player_thread.start()
+        self.player.start.emit()
+        player_thread.finished.connect(self.cleanup)
 
     @QtCore.pyqtSlot()
     def pause(self):
@@ -111,39 +114,14 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
     def play_music(self, new_state):
         if not self.player:
             return
-        self.player.mixer.muted = not new_state
+        new_state and self.player.mute_music() or self.player.unmute_music()
 
     @QtCore.pyqtSlot(bool)
     def signal_arduino(self, new_state):
         if not self.player:
             return
-        self.player.arduino_muted = not new_state
+        new_state and self.player.mute_arduino() or self.player.unmute_arduino()
 
     @QtCore.pyqtSlot(bool)
     def add_claps(self, new_state):
         pass
-
-    @QtCore.pyqtSlot(bytes)
-    @capture_exceptions
-    def interpret_message(self, message: bytes):
-        if in_reduce(all, message, (BYTE_UNCHANGED,)):
-            return
-
-        self.virtual_arduino.toggle_lanes([message[LANE_PINS[i]] for i in range(4)])
-        self.virtual_arduino.toogle_snap([
-            snap
-            for snap in [
-                message[SNAP_PINS[possible_snap]] and possible_snap or None
-                for possible_snap in [4, 8, 12, 16, 24]
-            ]
-            if snap is not None
-        ])
-
-
-if __name__ == "__main__":
-    import sys
-
-    app = QtWidgets.QApplication(sys.argv)
-    the_app = EtternuinoMain()
-
-    sys.exit(app.exec_())

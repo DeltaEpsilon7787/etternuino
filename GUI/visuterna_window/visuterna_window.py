@@ -44,7 +44,7 @@ class VisuternaWindow(QtWidgets.QDialog, Ui_visuterna_dialog):
         self.local_dial.valueChanged.connect(self.modify_local)
         self.global_dial.valueChanged.connect(self.modify_global)
         self.blink_dial.valueChanged.connect(self.modify_blink)
-        self.nps_window_dial.sliderReleased.connect(self.modify_nps_window)
+        self.nps_window_dial.valueChanged.connect(self.modify_nps_window)
 
         self.local_dial.setValue(20000)
         self.global_dial.setValue(60000)
