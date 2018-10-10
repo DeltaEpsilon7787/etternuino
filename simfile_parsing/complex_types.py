@@ -2,7 +2,7 @@ from fractions import Fraction
 
 from attr import attrib, attrs
 
-from basic_types import Beat, Measure
+from simfile_parsing.basic_types import Beat, Measure
 
 
 def _beat_to_measure(beat: Beat) -> Measure:

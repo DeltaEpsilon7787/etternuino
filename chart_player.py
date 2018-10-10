@@ -10,13 +10,13 @@ import sounddevice as sd
 from PyQt5 import QtCore
 from attr import attrib, attrs
 
-from basic_types import Time
-from chart_parser import Simfile
 from clap_mapper import BaseClapMapper
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
     SNAP_PINS, capture_exceptions, in_reduce
 from mixer import Mixer
-from rows import GlobalScheduledRow, Snap
+from simfile_parsing.basic_types import Time
+from simfile_parsing.chart_parser import Simfile
+from simfile_parsing.rows import GlobalScheduledRow, Snap
 
 
 class ChartPlayer(QtCore.QObject):

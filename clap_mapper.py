@@ -2,7 +2,7 @@ from typing import Callable
 
 import numpy as np
 
-from rows import GlobalTimedRow
+from simfile_parsing.rows import GlobalTimedRow
 
 
 class BaseClapMapper(Callable):

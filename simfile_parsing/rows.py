@@ -2,9 +2,9 @@ from functools import lru_cache
 
 from attr import attrib, attrs
 
-from basic_types import GlobalPosition, LocalPosition, NoteObjects, Time
-from complex_types import Color
 from definitions import SNAP_PINS
+from simfile_parsing.basic_types import GlobalPosition, LocalPosition, NoteObjects, Time
+from simfile_parsing.complex_types import Color
 
 
 @attrs(cmp=False)

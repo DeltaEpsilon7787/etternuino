@@ -9,9 +9,9 @@ from typing import List, Optional
 import lark
 from attr import Factory, attrib, attrs
 
-from basic_types import NoteObjects, Time
-from complex_types import MeasureMeasurePair, MeasureValuePair
-from rows import GlobalRow, GlobalTimedRow, LocalRow, PureRow
+from simfile_parsing.basic_types import NoteObjects, Time
+from simfile_parsing.complex_types import MeasureMeasurePair, MeasureValuePair
+from simfile_parsing.rows import GlobalRow, GlobalTimedRow, LocalRow, PureRow
 
 
 @attrs(cmp=False, auto_attribs=True)

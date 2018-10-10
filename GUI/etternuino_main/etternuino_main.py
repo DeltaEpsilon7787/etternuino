@@ -4,11 +4,11 @@ from fractions import Fraction
 from PyQt5 import QtCore, QtWidgets
 
 from GUI.etternuino_main.etternuino_gui import Ui_etternuino_window
-from basic_types import Time
-from chart_parser import parse_simfile
 from chart_player import ChartPlayer
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_UNCHANGED, LANE_PINS, \
     SNAP_PINS, capture_exceptions, in_reduce
+from simfile_parsing.basic_types import Time
+from simfile_parsing.chart_parser import parse_simfile
 
 
 class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):

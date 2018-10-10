@@ -3,8 +3,8 @@ from fractions import Fraction
 import numpy as np
 import soundfile as sf
 
-from basic_types import Time
 from definitions import DEFAULT_SAMPLE_RATE
+from simfile_parsing.basic_types import Time
 
 
 class Mixer(object):
