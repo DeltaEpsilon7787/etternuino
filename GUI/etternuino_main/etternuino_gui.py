@@ -6,7 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
 
 class Ui_etternuino_window(object):
     def setupUi(self, etternuino_window):
@@ -50,4 +51,3 @@ class Ui_etternuino_window(object):
         self.signal_arduino_checkbox.setText(_translate("etternuino_window", "Signal Arduino"))
         self.add_claps_checkbox.setText(_translate("etternuino_window", "Add claps"))
         self.play_button.setText(_translate("etternuino_window", "Play file"))
-

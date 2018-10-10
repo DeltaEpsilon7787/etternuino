@@ -1,87 +1,181 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>visuterna_dialog</class>
- <widget class="QDialog" name="visuterna_dialog">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>535</width>
-    <height>280</height>
-   </rect>
-  </property>
-  <property name="windowTitle">
-   <string>Visuterna</string>
-  </property>
-  <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="0">
-    <widget class="QSplitter" name="splitter_4">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <widget class="QWidget" name="horizontalLayoutWidget">
-      <layout class="QHBoxLayout" name="lane_group"/>
-     </widget>
-     <widget class="QWidget" name="horizontalLayoutWidget_2">
-      <layout class="QHBoxLayout" name="nps_group"/>
-     </widget>
-     <widget class="QWidget" name="horizontalLayoutWidget_3">
-      <layout class="QHBoxLayout" name="dial_group"/>
-     </widget>
-     <widget class="QWidget" name="control_group" native="true">
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
-        <widget class="QSplitter" name="splitter_3">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <widget class="QSplitter" name="splitter">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <widget class="QPushButton" name="stop_btn">
-           <property name="text">
-            <string>Stop</string>
-           </property>
-          </widget>
-          <widget class="QPushButton" name="pause_btn">
-           <property name="text">
-            <string>Pause</string>
-           </property>
-          </widget>
-         </widget>
-         <widget class="QSplitter" name="splitter_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-          <widget class="QLabel" name="progress_label">
-           <property name="text">
-            <string>Progress:</string>
-           </property>
-          </widget>
-          <widget class="QSlider" name="progress_slider">
-           <property name="maximum">
-            <number>0</number>
-           </property>
-           <property name="singleStep">
-            <number>4410</number>
-           </property>
-           <property name="pageStep">
-            <number>44100</number>
-           </property>
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-          </widget>
-         </widget>
-        </widget>
-       </item>
-      </layout>
-     </widget>
+    <class>visuterna_dialog</class>
+    <widget class="QDialog" name="visuterna_dialog">
+        <property name="windowTitle">
+            <string>Visuterna</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout">
+            <item>
+                <layout class="QHBoxLayout" name="lane_group"/>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="nps_group"/>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="dial_group"/>
+            </item>
+            <item>
+                <layout class="QHBoxLayout" name="progress_group">
+                    <item>
+                        <layout class="QVBoxLayout" name="control_group">
+                            <item>
+                                <widget class="QPushButton" name="pause_btn">
+                                    <property name="text">
+                                        <string>Pause</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QPushButton" name="unpause_btn">
+                                    <property name="text">
+                                        <string>Unpause</string>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QPushButton" name="stop_btn">
+                                    <property name="text">
+                                        <string>Stop</string>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </item>
+                    <item>
+                        <layout class="QHBoxLayout" name="scroll_group">
+                            <item>
+                                <widget class="QLabel" name="progress_label">
+                                    <property name="text">
+                                        <string>Progress:</string>
+                                    </property>
+                                    <property name="buddy">
+                                        <cstring>progress_slider</cstring>
+                                    </property>
+                                </widget>
+                            </item>
+                            <item>
+                                <widget class="QSlider" name="progress_slider">
+                                    <property name="singleStep">
+                                        <number>4410</number>
+                                    </property>
+                                    <property name="pageStep">
+                                        <number>44100</number>
+                                    </property>
+                                    <property name="orientation">
+                                        <enum>Qt::Horizontal</enum>
+                                    </property>
+                                </widget>
+                            </item>
+                        </layout>
+                    </item>
+                </layout>
+            </item>
+        </layout>
     </widget>
-   </item>
-  </layout>
- </widget>
- <resources/>
- <connections/>
+    <resources/>
+    <connections>
+        <connection>
+            <sender>pause_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>pause_btn</receiver>
+            <slot>hide()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>72</x>
+                    <y>48</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>75</x>
+                    <y>50</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>unpause_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>unpause_btn</receiver>
+            <slot>hide()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>51</x>
+                    <y>78</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>70</x>
+                    <y>79</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>unpause_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>pause_btn</receiver>
+            <slot>show()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>28</x>
+                    <y>76</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>16</x>
+                    <y>43</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>pause_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>unpause_btn</receiver>
+            <slot>show()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>41</x>
+                    <y>39</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>86</x>
+                    <y>83</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>progress_slider</sender>
+            <signal>valueChanged(int)</signal>
+            <receiver>visuterna_dialog</receiver>
+            <slot>rewind(int)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>153</x>
+                    <y>76</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>240</x>
+                    <y>90</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>stop_btn</sender>
+            <signal>clicked()</signal>
+            <receiver>visuterna_dialog</receiver>
+            <slot>reject()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>67</x>
+                    <y>113</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>82</x>
+                    <y>128</y>
+                </hint>
+            </hints>
+        </connection>
+    </connections>
+    <slots>
+        <slot>pause()</slot>
+        <slot>unpause()</slot>
+        <slot>stop()</slot>
+        <slot>rewind(int)</slot>
+    </slots>
 </ui>

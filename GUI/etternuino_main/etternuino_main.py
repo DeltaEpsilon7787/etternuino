@@ -1,169 +1,28 @@
 import os
 from fractions import Fraction
 
-import serial
 from PyQt5 import QtCore, QtWidgets
 
-from GUI.visuterna_window.visuterna_window import VisuternaWindow
+from GUI.etternuino_main.etternuino_gui import Ui_etternuino_window
 from basic_types import Time
 from chart_parser import parse_simfile
 from chart_player import ChartPlayer
-from GUI.chart_selection_dialog.chart_selection import ChartSelectionDialog
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_UNCHANGED, LANE_PINS, \
     SNAP_PINS, capture_exceptions, in_reduce
 
 
-class EtternuinoApp(QtWidgets.QMainWindow):
-    def __init__(self, *args, **kwargs):
-        QtWidgets.QMainWindow.__init__(self, *args, **kwargs)
+class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
+    def __init__(self):
+        super().__init__(self)
+        self.setup_ui()
 
-        self.setObjectName("self")
-        self.resize(254, 463)
-        self.setWindowTitle("Etternuino")
-        self.main_widget = QtWidgets.QWidget(self)
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.main_widget)
-        self.lane_group = QtWidgets.QWidget(self.main_widget)
-        self.horizontalLayout = QtWidgets.QHBoxLayout(self.lane_group)
-        self.lane_0 = QtWidgets.QFrame(self.lane_group)
-        self.lane_1 = QtWidgets.QFrame(self.lane_group)
-        self.lane_2 = QtWidgets.QFrame(self.lane_group)
-        self.lane_3 = QtWidgets.QFrame(self.lane_group)
-        self.checkbox_group = QtWidgets.QWidget(self.main_widget)
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.checkbox_group)
-        self.play_music_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
-        self.signal_arduino_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
-        self.add_claps_checkbox = QtWidgets.QCheckBox(self.checkbox_group)
-        self.play_group = QtWidgets.QWidget(self.main_widget)
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.play_group)
-        self.play_file_btn = QtWidgets.QPushButton(self.play_group)
-        self.control_group = QtWidgets.QWidget(self.main_widget)
-        self.play_active_group = QtWidgets.QHBoxLayout(self.control_group)
-        self.pause_stop_group = QtWidgets.QWidget(self.control_group)
-        self.ctrl_button_group = QtWidgets.QVBoxLayout(self.pause_stop_group)
-        self.pause_btn = QtWidgets.QPushButton(self.pause_stop_group)
-        self.unpause_btn = QtWidgets.QPushButton(self.pause_stop_group)
-        self.stop_btn = QtWidgets.QPushButton(self.pause_stop_group)
-        self.label_3 = QtWidgets.QLabel(self.control_group)
-        self.progress_slider = QtWidgets.QSlider(self.control_group)
-        self.widget = QtWidgets.QWidget(self.main_widget)
-
-        self.chart_selection = ChartSelectionDialog()
-        self.virtual_arduino = VisuternaWindow()
         self.active_threads = []
         self.player = None
         self.arduino = None
-        self.setup_ui()
 
-        try:
-            self.arduino = serial.Serial('COM4')
-        except serial.SerialException:
-            try:
-                self.arduino = serial.Serial('/dev/ttyUSB0')
-            except serial.SerialException:
-                self.signal_arduino_checkbox.setVisible(False)
-
+        from serial.tools import list_ports
+        list_ports
         self.show()
-
-    def setup_ui(self):
-        self.main_widget.setObjectName("main_widget")
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.lane_group.setObjectName("lane_group")
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        self.lane_0.setMinimumSize(QtCore.QSize(50, 50))
-        self.lane_0.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.lane_0.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.lane_0.setObjectName("lane_0")
-        self.horizontalLayout.addWidget(self.lane_0)
-        self.lane_1.setMinimumSize(QtCore.QSize(50, 50))
-        self.lane_1.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.lane_1.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.lane_1.setObjectName("lane_1")
-        self.horizontalLayout.addWidget(self.lane_1)
-        self.lane_2.setMinimumSize(QtCore.QSize(50, 50))
-        self.lane_2.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.lane_2.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.lane_2.setObjectName("lane_2")
-        self.horizontalLayout.addWidget(self.lane_2)
-        self.lane_3.setMinimumSize(QtCore.QSize(50, 50))
-        self.lane_3.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.lane_3.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.lane_3.setObjectName("lane_3")
-        self.horizontalLayout.addWidget(self.lane_3)
-        self.verticalLayout_2.addWidget(self.lane_group)
-        self.checkbox_group.setObjectName("checkbox_group")
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.play_music_checkbox.setChecked(True)
-        self.play_music_checkbox.setObjectName("play_music_checkbox")
-        self.verticalLayout.addWidget(self.play_music_checkbox)
-        self.signal_arduino_checkbox.setChecked(True)
-        self.signal_arduino_checkbox.setObjectName("signal_arduino_checkbox")
-        self.verticalLayout.addWidget(self.signal_arduino_checkbox)
-        self.add_claps_checkbox.setObjectName("add_claps_checkbox")
-        self.verticalLayout.addWidget(self.add_claps_checkbox)
-        self.verticalLayout_2.addWidget(self.checkbox_group)
-        self.play_group.setObjectName("play_group")
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.play_file_btn.setFlat(False)
-        self.play_file_btn.setObjectName("play_file_btn")
-        self.horizontalLayout_2.addWidget(self.play_file_btn)
-        self.verticalLayout_2.addWidget(self.play_group)
-        self.control_group.setObjectName("control_group")
-        self.play_active_group.setObjectName("play_active_group")
-        self.pause_stop_group.setEnabled(True)
-        self.pause_stop_group.setObjectName("pause_stop_group")
-        self.ctrl_button_group.setObjectName("ctrl_button_group")
-        self.pause_btn.setObjectName("pause_btn")
-        self.ctrl_button_group.addWidget(self.pause_btn)
-        self.unpause_btn.setObjectName("unpause_btn")
-        self.unpause_btn.setVisible(False)
-        self.ctrl_button_group.addWidget(self.unpause_btn)
-        self.stop_btn.setObjectName("stop_btn")
-        self.ctrl_button_group.addWidget(self.stop_btn)
-        self.play_active_group.addWidget(self.pause_stop_group)
-        self.label_3.setObjectName("label_3")
-        self.play_active_group.addWidget(self.label_3)
-        self.progress_slider.setMaximum(0)
-        self.progress_slider.setSingleStep(4410)
-        self.progress_slider.setPageStep(44100)
-        self.progress_slider.setOrientation(QtCore.Qt.Horizontal)
-        self.progress_slider.setObjectName("progress_slider")
-        self.play_active_group.addWidget(self.progress_slider)
-        self.verticalLayout_2.addWidget(self.control_group)
-        self.widget.setObjectName("widget")
-        self.setCentralWidget(self.main_widget)
-
-        self.retranslate_ui()
-        self.play_file_btn.clicked.connect(self.play_file)
-        self.pause_btn.clicked.connect(self.pause)
-        self.unpause_btn.clicked.connect(self.unpause)
-        self.stop_btn.clicked.connect(self.stop)
-        self.play_music_checkbox.toggled['bool'].connect(self.play_music)
-        self.signal_arduino_checkbox.toggled['bool'].connect(self.signal_arduino)
-        self.add_claps_checkbox.toggled['bool'].connect(self.add_claps)
-        self.progress_slider.sliderMoved['int'].connect(self.change_current_time)
-        self.progress_slider.sliderReleased.connect(self.update_player)
-        QtCore.QMetaObject.connectSlotsByName(self)
-
-        self.set_control_group_visibility(False)
-
-    def retranslate_ui(self):
-        _translate = QtCore.QCoreApplication.translate
-        self.play_music_checkbox.setText(_translate("self", "Play music"))
-        self.signal_arduino_checkbox.setText(_translate("self", "Signal Arduino"))
-        self.add_claps_checkbox.setText(_translate("self", "Add claps"))
-        self.play_file_btn.setText(_translate("self", "Play file"))
-        self.pause_btn.setText(_translate("self", "Pause"))
-        self.unpause_btn.setText(_translate("self", "Unpause"))
-        self.stop_btn.setText(_translate("self", "Stop"))
-        self.label_3.setText(_translate("self", "Progress:"))
-
-    @QtCore.pyqtSlot(bool)
-    def set_control_group_visibility(self, state):
-        self.control_group.setVisible(state)
-
-    @QtCore.pyqtSlot(bool)
-    def set_play_group_visibility(self, state):
-        self.play_group.setVisible(state)
 
     @QtCore.pyqtSlot(int)
     def change_current_time(self, new_value):
@@ -287,6 +146,6 @@ if __name__ == "__main__":
     import sys
 
     app = QtWidgets.QApplication(sys.argv)
-    the_app = EtternuinoApp()
+    the_app = EtternuinoMain()
 
     sys.exit(app.exec_())

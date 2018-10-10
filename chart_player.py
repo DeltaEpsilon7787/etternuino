@@ -2,19 +2,19 @@ from collections.__init__ import deque
 from fractions import Fraction
 from itertools import groupby
 from operator import attrgetter, itemgetter
-from typing import Optional, Sequence, List, Set, Tuple
+from typing import List, Optional, Sequence, Set, Tuple
 
 import pydub
 import serial
 import sounddevice as sd
 from PyQt5 import QtCore
-from attr import attrs, attrib
+from attr import attrib, attrs
 
 from basic_types import Time
 from chart_parser import Simfile
-from definitions import DEFAULT_SAMPLE_RATE, capture_exceptions, in_reduce, SNAP_PINS, LANE_PINS, BYTE_UNCHANGED, \
-    ARDUINO_MESSAGE_LENGTH, BYTE_TRUE, BYTE_FALSE
-from etternuino import BaseClapMapper
+from clap_mapper import BaseClapMapper
+from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
+    SNAP_PINS, capture_exceptions, in_reduce
 from mixer import Mixer
 from rows import GlobalScheduledRow, Snap
 

@@ -6,7 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
 
 class Ui_visuterna_dialog(object):
     def setupUi(self, visuterna_dialog):
@@ -67,4 +68,3 @@ class Ui_visuterna_dialog(object):
         self.unpause_btn.setText(_translate("visuterna_dialog", "Unpause"))
         self.stop_btn.setText(_translate("visuterna_dialog", "Stop"))
         self.progress_label.setText(_translate("visuterna_dialog", "Progress:"))
-

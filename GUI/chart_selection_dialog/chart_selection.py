@@ -1,49 +1,26 @@
 # -*- coding: utf-8 -*-
 from PyQt5 import QtCore, QtWidgets
 
-from definitions import capture_exceptions
+from GUI.chart_selection_dialog.chart_selection_gui import Ui_ChartSelectionDialog
 
 
-class ChartSelectionDialog(QtWidgets.QDialog):
+class ChartSelectionDialog(QtWidgets.QDialog, Ui_ChartSelectionDialog):
     on_selection = QtCore.pyqtSignal('int')
     on_cancel = QtCore.pyqtSignal()
 
-    @capture_exceptions
-    def __init__(self, *args, **kwargs):
-        QtWidgets.QDialog.__init__(self, *args, **kwargs)
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout(self)
-        self.verticalLayout = QtWidgets.QVBoxLayout()
-        self.chart_list = QtWidgets.QListWidget(self)
-        self.dialog_box = QtWidgets.QDialogButtonBox(self)
-        self.setup_ui()
+    def __init__(self):
+        super().__init__(self)
+        self.setupUi(self)
 
-        self.dialog_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(
-            lambda: (
-                self.on_selection.emit(self.chart_list.selectedIndexes()[0].row())
-                if self.chart_list.selectedIndexes() else
-                self.on_selection.emit(-1)
-            )
-        )
-        self.dialog_box.button(QtWidgets.QDialogButtonBox.Ok).clicked.connect(self.close)
-        self.dialog_box.button(QtWidgets.QDialogButtonBox.Cancel).clicked.connect(self.close)
-        self.setWindowModality(QtCore.Qt.ApplicationModal)
-        self.chart_list.setSelectionMode(QtWidgets.QListWidget.SingleSelection)
+    @QtCore.pyqtSlot()
+    def accept(self):
+        selected = self.chart_list.selectedIndexes()
+        if selected:
+            self.on_selection.emit(selected[0].row())
+        else:
+            self.on_selection.emit(-1)
+            self.reject()
 
-    def setup_ui(self):
-        self.setObjectName("ChartSelectionDialog")
-        self.resize(400, 300)
-        self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.chart_list.setObjectName("chart_list")
-        self.verticalLayout.addWidget(self.chart_list)
-        self.dialog_box.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
-        self.dialog_box.setObjectName("dialog_box")
-        self.verticalLayout.addWidget(self.dialog_box)
-        self.verticalLayout_2.addLayout(self.verticalLayout)
-
-        self.retranslate_ui()
-        QtCore.QMetaObject.connectSlotsByName(self)
-
-    def retranslate_ui(self):
-        _translate = QtCore.QCoreApplication.translate
-        self.setWindowTitle(_translate("ChartSelectionDialog", "Chart selection"))
+    @QtCore.pyqtSlot()
+    def reject(self):
+        self.on_cancel.emit()

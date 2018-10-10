@@ -1,26 +1,23 @@
 # -*- coding: utf-8 -*-
-
-# Form implementation generated from reading ui file 'visuterna.ui'
-#
-# Created by: PyQt5 UI code generator 5.6
-#
-# WARNING! All changes made in this file will be lost!
-
-from PyQt5 import QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 from GUI.dial_group.dial_group import DialGroup
 from GUI.visuterna_window.visuterna_gui import Ui_visuterna_dialog
 
 
-class VisuternaLogic(QtWidgets.QDialog, Ui_visuterna_dialog):
+class VisuternaWindow(QtWidgets.QDialog, Ui_visuterna_dialog):
+    time_changed = QtCore.pyqtSignal(int)
+
     def __init__(self, lanes_amt=4):
         super().__init__(self)
         self.setupUi(self)
 
+        self.unpause_btn.hide()
+        self.nps_window = 3.0
+
         self.lane_frames = []
         self.lane_nps_bars = []
 
-        # Create lane objects
         for i in range(lanes_amt):
             lane_frame = QtWidgets.QFrame(self.lane_group)
             lane_nps_bar = QtWidgets.QProgressBar(self.nps_group)
@@ -49,8 +46,6 @@ class VisuternaLogic(QtWidgets.QDialog, Ui_visuterna_dialog):
         self.blink_dial.valueChanged.connect(self.modify_blink)
         self.nps_window_dial.sliderReleased.connect(self.modify_nps_window)
 
-        self.nps_window = 3.0
-
         self.local_dial.setValue(20000)
         self.global_dial.setValue(60000)
         self.blink_dial.setValue(50)
@@ -65,3 +60,7 @@ class VisuternaLogic(QtWidgets.QDialog, Ui_visuterna_dialog):
 
     def modify_nps_window(self, new_window):
         self.nps_window = new_window
+
+    @QtCore.pyqtSlot(int)
+    def rewind(self, new_time):
+        self.time_changed.emit(new_time)

@@ -6,7 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
+
 
 class Ui_dial_group(object):
     def setupUi(self, dial_group):
@@ -33,4 +34,3 @@ class Ui_dial_group(object):
     def retranslateUi(self, dial_group):
         _translate = QtCore.QCoreApplication.translate
         dial_group.setWindowTitle(_translate("dial_group", "Frame"))
-
