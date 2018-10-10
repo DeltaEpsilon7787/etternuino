@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>visuterna_dialog</class>
+ <widget class="QDialog" name="visuterna_dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>535</width>
+    <height>280</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Visuterna</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QSplitter" name="splitter_4">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <widget class="QWidget" name="horizontalLayoutWidget">
+      <layout class="QHBoxLayout" name="lane_group"/>
+     </widget>
+     <widget class="QWidget" name="horizontalLayoutWidget_2">
+      <layout class="QHBoxLayout" name="nps_group"/>
+     </widget>
+     <widget class="QWidget" name="horizontalLayoutWidget_3">
+      <layout class="QHBoxLayout" name="dial_group"/>
+     </widget>
+     <widget class="QWidget" name="control_group" native="true">
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QSplitter" name="splitter_3">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <widget class="QSplitter" name="splitter">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <widget class="QPushButton" name="stop_btn">
+           <property name="text">
+            <string>Stop</string>
+           </property>
+          </widget>
+          <widget class="QPushButton" name="pause_btn">
+           <property name="text">
+            <string>Pause</string>
+           </property>
+          </widget>
+         </widget>
+         <widget class="QSplitter" name="splitter_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <widget class="QLabel" name="progress_label">
+           <property name="text">
+            <string>Progress:</string>
+           </property>
+          </widget>
+          <widget class="QSlider" name="progress_slider">
+           <property name="maximum">
+            <number>0</number>
+           </property>
+           <property name="singleStep">
+            <number>4410</number>
+           </property>
+           <property name="pageStep">
+            <number>44100</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
