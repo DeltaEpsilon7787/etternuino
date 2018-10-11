@@ -2,13 +2,16 @@ from fractions import Fraction
 
 import numpy as np
 import soundfile as sf
+from PyQt5 import QtCore
 
 from definitions import DEFAULT_SAMPLE_RATE
 from simfile_parsing.basic_types import Time
 
 
-class Mixer(object):
+class Mixer(QtCore.QObject):
     def __init__(self, data=np.zeros((60 * DEFAULT_SAMPLE_RATE, 2)), sample_rate=DEFAULT_SAMPLE_RATE):
+        super().__init__()
+
         self.data = data.copy()
         self.sample_rate = sample_rate
         self.current_frame = 0

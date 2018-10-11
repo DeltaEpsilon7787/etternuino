@@ -8,13 +8,13 @@
 
 from PyQt5 import QtCore, QtWidgets
 
-
 class Ui_ChartSelectionDialog(object):
     def setupUi(self, ChartSelectionDialog):
         ChartSelectionDialog.setObjectName("ChartSelectionDialog")
+        ChartSelectionDialog.setWindowModality(QtCore.Qt.ApplicationModal)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ChartSelectionDialog)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        self.chart_list = QtWidgets.QListView(ChartSelectionDialog)
+        self.chart_list = QtWidgets.QListWidget(ChartSelectionDialog)
         self.chart_list.setObjectName("chart_list")
         self.verticalLayout_2.addWidget(self.chart_list)
         self.dialog_box = QtWidgets.QDialogButtonBox(ChartSelectionDialog)
@@ -31,3 +31,4 @@ class Ui_ChartSelectionDialog(object):
     def retranslateUi(self, ChartSelectionDialog):
         _translate = QtCore.QCoreApplication.translate
         ChartSelectionDialog.setWindowTitle(_translate("ChartSelectionDialog", "Chart selection"))
+

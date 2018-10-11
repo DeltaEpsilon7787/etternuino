@@ -39,3 +39,10 @@ def capture_exceptions(func):
             return
 
     return decorator
+
+
+def make_blank_message():
+    blank_message = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
+    for pin in SNAP_PINS.values():
+        blank_message[pin] = BYTE_FALSE
+    return blank_message

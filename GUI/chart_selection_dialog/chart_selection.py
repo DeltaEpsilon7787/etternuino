@@ -9,7 +9,7 @@ class ChartSelectionDialog(QtWidgets.QDialog, Ui_ChartSelectionDialog):
     on_cancel = QtCore.pyqtSignal()
 
     def __init__(self):
-        super().__init__(self)
+        super().__init__()
         self.setupUi(self)
 
     @QtCore.pyqtSlot()
@@ -17,6 +17,7 @@ class ChartSelectionDialog(QtWidgets.QDialog, Ui_ChartSelectionDialog):
         selected = self.chart_list.selectedIndexes()
         if selected:
             self.on_selection.emit(selected[0].row())
+            self.close()
         else:
             self.on_selection.emit(-1)
             self.reject()

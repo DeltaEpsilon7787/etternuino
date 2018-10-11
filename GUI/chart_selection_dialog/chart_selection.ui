@@ -10,7 +10,7 @@
         </property>
         <layout class="QVBoxLayout" name="verticalLayout_2">
             <item>
-                <widget class="QListView" name="chart_list"/>
+                <widget class="QListWidget" name="chart_list"/>
             </item>
             <item>
                 <widget class="QDialogButtonBox" name="dialog_box">

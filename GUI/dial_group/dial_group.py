@@ -5,7 +5,7 @@ from GUI.dial_group.dial_group_gui import Ui_dial_group
 
 class DialGroup(QtWidgets.QFrame, Ui_dial_group):
     def __init__(self, name, minimum=0, maximum=1, divisor=0.01, slot=None):
-        super().__init__(self)
+        super().__init__()
         self.setupUi(self)
 
         self.meaning_label.setText(name)

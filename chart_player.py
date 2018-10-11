@@ -10,8 +10,8 @@ from PyQt5 import QtCore
 from attr import attrib, attrs
 
 from clap_mapper import BaseClapMapper
-from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, BYTE_TRUE, BYTE_UNCHANGED, DEFAULT_SAMPLE_RATE, LANE_PINS, \
-    SNAP_PINS, capture_exceptions, in_reduce
+from definitions import BYTE_FALSE, BYTE_TRUE, DEFAULT_SAMPLE_RATE, LANE_PINS, \
+    capture_exceptions, in_reduce, make_blank_message
 from mixer import Mixer
 from simfile_parsing.basic_types import Time
 from simfile_parsing.rows import GlobalScheduledRow, Snap
@@ -25,19 +25,91 @@ class NoteEvent:
     row: GlobalScheduledRow = attrib()
 
 
-class ChartPlayer(QtCore.QObject):
-    on_start: QtCore.pyqtSignal = QtCore.pyqtSignal()
-    on_end: QtCore.pyqtSignal = QtCore.pyqtSignal()
-    on_write: QtCore.pyqtSignal = QtCore.pyqtSignal(object)
+class EventScheduler:
+    def __init__(self):
+        self.microblink_duration = Fraction('0.01')
+        self.blink_duration = Fraction('0.06')
 
+    def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
+        snap_sequence = self.obtain_snap_changes(notes)
+        lane_changes = self.obtain_lane_changes(notes)
+        ordered_events = self.compose_events(lane_changes, snap_sequence)
+        result = self.merge_events_into_messages(ordered_events)
+
+        return result
+
+    @staticmethod
+    def obtain_snap_changes(notes):
+        snap_sequence = []
+        for note in notes:
+            if in_reduce(all, note.objects, ('0', '3', '5', 'M')):
+                continue
+            snap_sequence.append((note.time,
+                                  Snap.from_row(note),
+                                  note))
+        return snap_sequence
+
+    def obtain_lane_changes(self, notes):
+        lane_changes = [[] for _ in range(len(LANE_PINS))]
+        for lane in range(len(LANE_PINS)):
+            active_list = lane_changes[lane]
+
+            for note in notes:
+                if note.objects[lane] in ('0', 'M'):
+                    continue
+                if note.objects[lane] in ('1',):
+                    if active_list and active_list[-1] > note.time:
+                        active_list[-1] = note.time - self.microblink_duration
+                    active_list.append(note.time)
+                    active_list.append(note.time + self.blink_duration)
+                if note.objects[lane] in ('2', '3', '4', '5'):
+                    active_list.append(note.time)
+        return lane_changes
+
+    @staticmethod
+    def compose_events(lane_changes, snap_sequence):
+        ordered_events = []
+        for lane in range(len(LANE_PINS)):
+            active_list = lane_changes[lane]
+
+            snap_index = 0
+            for status, time in enumerate(active_list, start=1):
+                status %= 2
+                if status:
+                    while snap_sequence[snap_index][0] < time:
+                        snap_index += 1
+                    snap_index -= 1
+                ordered_events.append((time, snap_sequence[snap_index], lane, status))
+        ordered_events.sort(key=itemgetter(0))
+        return ordered_events
+
+    @staticmethod
+    def merge_events_into_messages(ordered_events):
+        result = []
+        blank_message = make_blank_message()
+        for time, snap, lane, status in ordered_events:
+            message = blank_message.copy()
+            message[LANE_PINS[lane]] = status and BYTE_TRUE or BYTE_FALSE
+            for pin in snap[1].arduino_pins:
+                message[pin] = BYTE_TRUE
+            result.append(NoteEvent(time, b''.join(message), snap[2]))
+        return result
+
+
+class ChartPlayer(QtCore.QObject, EventScheduler):
+    on_start = QtCore.pyqtSignal()
+    on_end = QtCore.pyqtSignal()
+    on_write = QtCore.pyqtSignal(object)
+    time_tick = QtCore.pyqtSignal(object)
+
+    @capture_exceptions
     def __init__(self,
                  chart: AugmentedChart,
                  audio: io.BufferedReader,
                  sound_start_delta: Time = 0,
                  arduino: Optional[serial.Serial] = None,
-                 music_out: bool = True,
                  clap_mapper: Optional[BaseClapMapper] = None):
-        super().__init__(self)
+        super().__init__()
 
         self.chart = chart
         self.audio = audio
@@ -45,9 +117,6 @@ class ChartPlayer(QtCore.QObject):
         self.arduino = arduino
         self.arduino_muted = False
         self.clap_mapper = clap_mapper
-
-        self.microblink_duration = Fraction('0.01')
-        self.blink_duration = Fraction('0.06')
 
         self.mixer = None
         self.music_stream = None
@@ -85,8 +154,7 @@ class ChartPlayer(QtCore.QObject):
 
     def wait_till(self, end_time: Time) -> None:
         while self.mixer.current_time < end_time:
-            if self.progress_slider_output:
-                self.progress_slider_output.setValue(self.mixer.current_frame)
+            self.time_tick.emit(self.mixer.current_time)
             if self.need_to_update_position or self.need_to_die:
                 break
             sd.sleep(1)
@@ -99,7 +167,7 @@ class ChartPlayer(QtCore.QObject):
                                             dtype='float32',
                                             callback=self.mixer)
 
-    def filter_chart_notes(self, chart):
+    def chart_to_timed_rows(self, chart):
         notes = sorted(chart.note_field)
         notes = (
             row
@@ -113,78 +181,21 @@ class ChartPlayer(QtCore.QObject):
 
         return notes
 
-    def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
-        snap_sequence = []
-        for note in notes:
-            if in_reduce(all, note.objects, ('0', '3', '5', 'M')):
-                continue
-            snap_sequence.append((note.time,
-                                  Snap.from_row(note),
-                                  note))
-
-        # And then lanes
-        lane_changes = [[] for _ in range(len(LANE_PINS))]
-        for lane in range(len(LANE_PINS)):
-            active_list = lane_changes[lane]
-
-            for note in notes:
-                if note.objects[lane] in ('0', 'M'):
-                    continue
-                if note.objects[lane] in ('1',):
-                    if active_list and active_list[-1] > note.time:
-                        active_list[-1] = note.time - self.microblink_duration
-                    active_list.append(note.time)
-                    active_list.append(note.time + self.blink_duration)
-                if note.objects[lane] in ('2', '3', '4', '5'):
-                    active_list.append(note.time)
-
-        # Compose ON-OFF-ON-OFF sequences
-        ordered_events = []
-        for lane in range(len(LANE_PINS)):
-            active_list = lane_changes[lane]
-
-            snap_index = 0
-            for status, time in enumerate(active_list, start=1):
-                status %= 2
-                if status:
-                    while snap_sequence[snap_index][0] < time:
-                        snap_index += 1
-                    snap_index -= 1
-                ordered_events.append((note.time, snap_sequence[snap_index], lane, status))
-
-        ordered_events.sort(key=itemgetter(0))
-
-        blank_message = [BYTE_UNCHANGED] * ARDUINO_MESSAGE_LENGTH
-        for snap in SNAP_PINS:
-            for pin in SNAP_PINS[snap]:
-                blank_message[pin] = BYTE_FALSE
-
-        result = []
-        for time, snap, lane, status in ordered_events:
-            message = blank_message.copy()
-            message[LANE_PINS[lane]] = status and BYTE_TRUE or BYTE_FALSE
-            for pin in snap[1].arduino_pins:
-                message[pin] = BYTE_TRUE
-            result.append(NoteEvent(time, b''.join(message), snap[2]))
-
-        return result
-
     @QtCore.pyqtSlot()
     @capture_exceptions
     def play(self):
-        self.load_audio()
-
-        notes = self.filter_chart_notes(self.chart)
-
-        if self.clap_mapper:
-            for row in notes:
-                self.mixer.add_sound(self.clap_mapper(row), row.time)
-
-        first_note = notes[0]
+        notes = self.chart_to_timed_rows(self.chart)
         sequence = self.schedule_events(notes)
 
-        self.on_start.emit()
+        self.load_audio()
+        self.inject_claps(notes)
 
+        try:
+            first_note = notes[0]
+        except IndexError:
+            return
+
+        self.on_start.emit()
         self.music_stream and self.music_stream.start()
         self.unpause()
         self.wait_till(first_note.time)
@@ -206,7 +217,12 @@ class ChartPlayer(QtCore.QObject):
                 self.need_to_update_position = False
             current_index += 1
 
+    def inject_claps(self, notes):
+        if self.clap_mapper:
+            for row in notes:
+                self.mixer.add_sound(self.clap_mapper(row), row.time)
+
     def cleanup(self):
         self.music_stream and self.music_stream.stop()
         self.on_end.emit()
-        self.disconnect()
+        # self.disconnect()
