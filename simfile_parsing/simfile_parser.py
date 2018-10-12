@@ -209,11 +209,12 @@ class ChartTransformer(lark.Transformer):
 
 
 class SimfileParser(QtCore.QObject):
+    parse_simfile = QtCore.pyqtSignal(str)
     simfile_parsed = QtCore.pyqtSignal(object)
 
     @QtCore.pyqtSlot(str)
     @capture_exceptions
-    def parse_simfile(self, file_path):
+    def perform_parsing(self, file_path):
         sm_transformer = ChartTransformer()
 
         this_dir = os.getcwd()

@@ -17,10 +17,10 @@ class ChartSelectionDialog(QtWidgets.QDialog, Ui_ChartSelectionDialog):
         selected = self.chart_list.selectedIndexes()
         if selected:
             self.on_selection.emit(selected[0].row())
-            self.close()
+            super().accept()
         else:
             self.on_selection.emit(-1)
-            self.reject()
+            super().reject()
 
     @QtCore.pyqtSlot()
     def reject(self):

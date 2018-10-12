@@ -1,4 +1,7 @@
+import collections
 import functools
+
+from PyQt5 import QtCore
 
 DEFAULT_SAMPLE_RATE = 44100
 BYTE_FALSE = b'\x00'
@@ -46,3 +49,22 @@ def make_blank_message():
     for pin in SNAP_PINS.values():
         blank_message[pin] = BYTE_FALSE
     return blank_message
+
+
+def run_in_thread(target: QtCore.QObject,
+                  thread_container,
+                  start_signal,
+                  connections: collections.OrderedDict):
+    target_thread = QtCore.QThread()
+    thread_container.append(target_thread)
+    target.moveToThread(target_thread)
+
+    for target_signal, target_slots in connections.items():
+        try:
+            for target_slot in target_slots:
+                getattr(target, target_signal).connect(target_slot)
+        except AttributeError:
+            getattr(target, target_signal).connect(target_slots)
+
+    start_signal()
+    return target_thread

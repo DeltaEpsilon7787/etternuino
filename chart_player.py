@@ -23,12 +23,13 @@ class NoteEvent:
     time: Time = attrib()
     arduino_message: bytes = attrib()
     row: GlobalScheduledRow = attrib()
+    state: bool = attrib()
 
 
 class EventScheduler:
     def __init__(self):
         self.microblink_duration = Fraction('0.01')
-        self.blink_duration = Fraction('0.06')
+        self.blink_duration = Fraction('0.12')
 
     def schedule_events(self, notes: Sequence[GlobalScheduledRow]):
         snap_sequence = self.obtain_snap_changes(notes)
@@ -63,6 +64,8 @@ class EventScheduler:
                     active_list.append(note.time)
                     active_list.append(note.time + self.blink_duration)
                 if note.objects[lane] in ('2', '3', '4', '5'):
+                    if active_list and active_list[-1] > note.time:
+                        active_list[-1] = note.time - self.microblink_duration
                     active_list.append(note.time)
         return lane_changes
 
@@ -76,11 +79,19 @@ class EventScheduler:
             for status, time in enumerate(active_list, start=1):
                 status %= 2
                 if status:
-                    while snap_sequence[snap_index][0] < time:
-                        snap_index += 1
-                    snap_index -= 1
+                    while time > snap_sequence[snap_index][0]:
+                        if snap_index < len(snap_sequence):
+                            snap_index += 1
+                        else:
+                            break
+                    while time < snap_sequence[snap_index][0]:
+                        if snap_index:
+                            snap_index -= 1
+                        else:
+                            break
                 ordered_events.append((time, snap_sequence[snap_index], lane, status))
         ordered_events.sort(key=itemgetter(0))
+
         return ordered_events
 
     @staticmethod
@@ -92,7 +103,7 @@ class EventScheduler:
             message[LANE_PINS[lane]] = status and BYTE_TRUE or BYTE_FALSE
             for pin in snap[1].arduino_pins:
                 message[pin] = BYTE_TRUE
-            result.append(NoteEvent(time, b''.join(message), snap[2]))
+            result.append(NoteEvent(time, b''.join(message), snap[2], bool(status)))
         return result
 
 
@@ -101,6 +112,7 @@ class ChartPlayer(QtCore.QObject, EventScheduler):
     on_end = QtCore.pyqtSignal()
     on_write = QtCore.pyqtSignal(object)
     time_tick = QtCore.pyqtSignal(object)
+    play_signal = QtCore.pyqtSignal()
 
     @capture_exceptions
     def __init__(self,
@@ -204,7 +216,7 @@ class ChartPlayer(QtCore.QObject, EventScheduler):
         while current_index < len(sequence):
             event = sequence[current_index]
             self.wait_till(event.time)
-            self.on_write.emit(event.row)
+            self.on_write.emit(event)
             self.arduino and not self.arduino_muted and self.arduino.write(event.arduino_message)
             if self.need_to_die:
                 return

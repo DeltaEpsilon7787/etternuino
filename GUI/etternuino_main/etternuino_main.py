@@ -1,11 +1,13 @@
+import os
 from fractions import Fraction
 
+import serial
 from PyQt5 import QtCore, QtWidgets
 
+from GUI.chart_selection_dialog.chart_selection import ChartSelectionDialog
 from GUI.etternuino_main.etternuino_gui import Ui_etternuino_window
 from GUI.visuterna_window.visuterna_window import VisuternaWindow
 from chart_player import ChartPlayer
-from chart_selection_dialog.chart_selection import ChartSelectionDialog
 from definitions import ARDUINO_MESSAGE_LENGTH, BYTE_FALSE, capture_exceptions
 from simfile_parsing.basic_types import Time
 from simfile_parsing.simfile_parser import Simfile, SimfileParser
@@ -17,7 +19,8 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
         self.setupUi(self)
 
         self.player: ChartPlayer = None
-        self.arduino = None
+        # self.arduino = None
+        self.arduino = serial.Serial('/dev/ttyUSB0')
         self.threads = []
         self.visuterna_window: VisuternaWindow = None
         self.chart_selection: ChartSelectionDialog = None
@@ -33,38 +36,45 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
         self.player.need_to_update_position = True
 
     @QtCore.pyqtSlot()
+    @capture_exceptions
     def play_file(self):
-        # sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose SM file...', os.getcwd(),
-        #                                                   'Simfiles (*.sm)')
-        sm_file = r"Q:\Games\Rhythm Games\Etterna\Songs\Singles\KABOOM!! (DeltaEpsilon)\chart.sm"
+        self.play_button.setEnabled(False)
+
+        sm_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Choose SM file...', os.getcwd(),
+                                                           'Simfiles (*.sm)')
+        # sm_file = r"Q:\Games\Rhythm Games\Etterna\Songs\Singles\KABOOM!! (DeltaEpsilon)\chart.sm"
         if sm_file == "":
+            self.play_button.setEnabled(True)
             return
 
         simfile_parser = SimfileParser()
         parsing_thread = QtCore.QThread()
-        parsing_thread.started.connect(lambda: self.threads.append(parsing_thread))
-        parsing_thread.started.connect(lambda: self.play_button.setEnabled(False))
-        parsing_thread.started.connect(lambda: simfile_parser.parse_simfile(sm_file))
-        parsing_thread.finished.connect(lambda: self.play_button.setEnabled(True))
-        simfile_parser.simfile_parsed.connect(self.select_chart)
         simfile_parser.moveToThread(parsing_thread)
         parsing_thread.start()
+
+        simfile_parser.parse_simfile.connect(simfile_parser.perform_parsing)
+        simfile_parser.simfile_parsed.connect(lambda _: self.play_button.setEnabled(True))
+        simfile_parser.simfile_parsed.connect(self.select_chart)
+        simfile_parser.simfile_parsed.connect(lambda _: self.cleanup)
+
+        self.threads.append((parsing_thread, simfile_parser))
+        simfile_parser.parse_simfile.emit(sm_file)
+
 
     @QtCore.pyqtSlot(object)
     def select_chart(self, parsed_simfile: Simfile):
         self.chart_selection = ChartSelectionDialog()
-        self.chart_selection.chart_list.clear()
         for index, chart in enumerate(parsed_simfile.charts, 1):
             self.chart_selection.chart_list.addItem(f'{index}: {chart.diff_name}')
-        self.chart_selection.on_selection['int'].connect(lambda chart_num: self.chart_selected(parsed_simfile,
-                                                                                               chart_num))
+        self.chart_selection.on_selection.connect(lambda chart_num: self.chart_selected(parsed_simfile, chart_num))
         self.chart_selection.on_cancel.connect(self.cleanup)
         self.chart_selection.show()
 
     @QtCore.pyqtSlot()
+    @capture_exceptions
     def open_visuterna(self):
-        self.visuterna_window = VisuternaWindow(4)
-        self.player.on_write[object].connect(self.visuterna_window.receive_event)
+        self.visuterna_window = VisuternaWindow(4, self.player)
+        self.player.on_write.connect(self.visuterna_window.receive_event)
         self.player.on_end.connect(self.visuterna_window.close)
         self.visuterna_window.show()
 
@@ -84,28 +94,16 @@ class EtternuinoMain(QtWidgets.QMainWindow, Ui_etternuino_window):
         )
 
         player_thread = QtCore.QThread()
-        player_thread.started.connect(lambda: self.threads.append(player_thread))
-        player_thread.started.connect(self.player.play)
-        player_thread.finished.connect(self.cleanup)
-        self.player.on_start.connect(self.open_visuterna)
         self.player.moveToThread(player_thread)
         player_thread.start()
 
-    @QtCore.pyqtSlot()
-    def pause(self):
-        self.player and self.player.pause()
-        self.unpause_btn.setVisible(True)
-        self.pause_btn.setVisible(False)
+        self.player.on_start.connect(self.open_visuterna)
+        self.player.play_signal.connect(self.player.play)
+        self.player.on_end.connect(self.cleanup)
 
-    @QtCore.pyqtSlot()
-    def unpause(self):
-        self.player and self.player.unpause()
-        self.unpause_btn.setVisible(False)
-        self.pause_btn.setVisible(True)
+        self.threads.append(player_thread)
+        self.player.play_signal.emit()
 
-    @QtCore.pyqtSlot()
-    def stop(self):
-        self.player.die()
 
     @QtCore.pyqtSlot()
     def cleanup(self):
